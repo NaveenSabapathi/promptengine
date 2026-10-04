@@ -10,7 +10,7 @@
 | `apps/api/promptengine/environment.py`, `wsgi.py` | Explicit `_FILE` secret loading and encoded database credentials |
 | `apps/web/Dockerfile` | Node/Vite build stage and non-root Nginx runtime; no Node server in production |
 | `deploy/nginx/` | HTTP redirect, TLS 1.2/1.3, SPA routing, immutable hashed assets, same-origin `/api` proxy, overwritten forwarding headers and dynamic Docker DNS |
-| `deploy/init.py` | Generate independent host-only secrets and non-secret settings without printing credentials |
+| `deploy/init.py`, `deploy/postgres/010-app.sh` | Generate independent secrets and initialize an application database owner without superuser, role-creation or replication privileges |
 | `deploy/backup.sh`, `restore.sh` | PostgreSQL custom-format backup and explicit maintenance restore |
 | `deploy/smoke.py` | Disposable test deployment: actual HTTPS/auth/CSRF/compiler, backup/restore, rate limits, log redaction and API replacement |
 | `.github/workflows/deployment.yml` | Build/run the real production containers and execute recovery checks |
@@ -45,7 +45,7 @@ Edit `.deploy.env` with public OAuth client IDs and billing settings. Fill the r
 
 An administrator can use `sudoedit` for existing read-only secret files. Preserve file mode 0444 after an editor replaces a file. Do not put secrets into Vite environment variables, image build arguments, GitHub commits or command lines. The API also supports `<SECRET_NAME>_FILE` for explicit file-based configuration outside Compose; configuring both a literal and a file fails clearly.
 
-Generated `postgres_password`, `session_secret` and `jwt_secret` must be retained across releases. Changing only the password file does **not** change an initialized PostgreSQL user's password. Rotate database credentials deliberately in PostgreSQL and the file together. Rotating session/JWT secrets invalidates existing web sessions; keep a private encrypted backup of configuration and secrets separately from database dumps.
+Generated `postgres_password`, `postgres_admin_password`, `session_secret` and `jwt_secret` must be retained across releases. Changing only the password file does **not** change an initialized PostgreSQL user's password. Rotate database credentials deliberately in PostgreSQL and the file together. Rotating session/JWT secrets invalidates existing web sessions; keep a private encrypted backup of configuration and secrets separately from database dumps.
 
 ## TLS certificates
 
@@ -73,6 +73,8 @@ docker compose --env-file .deploy.env ps -a
 docker compose --env-file .deploy.env exec -T web nginx -t
 curl --fail https://prompt.your-company.com/api/health/ready
 ```
+
+The PostgreSQL administrator password is mounted only into the database service; the API receives a separate password for the non-superuser database owner `promptengine`. The initialization script runs only for an empty volume. An existing volume must already contain these roles/databases; never delete a volume to change credentials.
 
 PostgreSQL must become healthy, then the one-shot `migrate` container must successfully upgrade Alembic before API startup. Migrations do not run concurrently in Gunicorn workers. The tokenizer vocabulary is downloaded at image build time so compiling works in the read-only runtime without an initial vocabulary download. Provider credentials and database access remain runtime-only.
 

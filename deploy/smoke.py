@@ -57,6 +57,8 @@ def main():
     assert config["services"]["web"]["environment"]["PUBLIC_DOMAIN"] == DOMAIN
     assert "ports" not in config["services"]["db"]
     assert "ports" not in config["services"]["api"]
+    privileges = command("exec", "-T", "db", "psql", "-U", "postgres", "-d", "postgres", "-tAc", "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='promptengine'")
+    assert privileges.strip() == "f"
     request("/api/health/ready")
     connection = http.client.HTTPConnection(DOMAIN, 80, timeout=10)
     connection.request("GET", "/workspace?check=redirect")

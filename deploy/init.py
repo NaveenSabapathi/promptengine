@@ -27,7 +27,7 @@ def main():
         parser.error("Deployment is already initialized; edit its existing files instead")
     os.umask(0o077)
     directory.mkdir(mode=0o700)
-    for name in ("postgres_password", "session_secret", "jwt_secret"):
+    for name in ("postgres_password", "postgres_admin_password", "session_secret", "jwt_secret"):
         path = directory / name
         path.write_text(secrets.token_urlsafe(48) + "\n")
         # Compose file-secret mounts retain host modes. Directory is private;
