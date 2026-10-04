@@ -1,0 +1,36 @@
+name: Production container validation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Initialize disposable deployment credentials and test TLS
+        run: |
+          python deploy/init.py --domain promptengine.test --self-signed
+          echo '127.0.0.1 promptengine.test' | sudo tee -a /etc/hosts
+          docker compose --env-file .deploy.env config --quiet
+      - name: Build actual production images
+        run: docker compose --env-file .deploy.env build
+      - name: Start database, migrate, API and TLS proxy
+        run: docker compose --env-file .deploy.env up -d --wait --wait-timeout 120
+      - name: Validate Nginx configuration
+        run: docker compose --env-file .deploy.env exec -T web nginx -t
+      - name: HTTPS deployment and recovery integration checks
+        run: python deploy/smoke.py
+      - name: Diagnostic logs (no secret files)
+        if: failure()
+        run: |
+          docker compose --env-file .deploy.env ps -a
+          docker compose --env-file .deploy.env logs --no-color --tail 150
+      - name: Remove disposable containers and data
+        if: always()
+        run: docker compose --env-file .deploy.env down -v

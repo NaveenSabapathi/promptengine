@@ -1,0 +1,133 @@
+name: promptengine
+x-api: &api
+  image: promptengine-api:${RELEASE_TAG:-local}
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  user: '10001:10001'
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    APP_ENV: production
+    WEB_ORIGIN: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in .deploy.env}
+    API_ORIGIN: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in .deploy.env}
+    TRUST_PROXY: 'true'
+    POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    SECRET_KEY_FILE: /run/secrets/session_secret
+    JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret
+    OPENAI_API_KEY_FILE: /run/secrets/openai_key
+    GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_secret
+    MICROSOFT_CLIENT_SECRET_FILE: /run/secrets/microsoft_secret
+    RAZORPAY_KEY_SECRET_FILE: /run/secrets/razorpay_secret
+    RAZORPAY_WEBHOOK_SECRET_FILE: /run/secrets/razorpay_webhook_secret
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+    MICROSOFT_TENANT: ${MICROSOFT_TENANT:-common}
+    OPENAI_MODEL: gpt-4o-mini
+    OPENAI_TIMEOUT_SECONDS: '20'
+    BILLING_ENABLED: ${BILLING_ENABLED:-false}
+    RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+    RAZORPAY_PRO_PLAN_ID: ${RAZORPAY_PRO_PLAN_ID:-}
+    PRO_DAILY_AI_LIMIT: ${PRO_DAILY_AI_LIMIT:-100}
+    PRO_PRICE_PAISE: ${PRO_PRICE_PAISE:-49900}
+    RAZORPAY_TOTAL_COUNT: ${RAZORPAY_TOTAL_COUNT:-120}
+    GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+  secrets:
+    - postgres_password
+    - session_secret
+    - jwt_secret
+    - openai_key
+    - google_secret
+    - microsoft_secret
+    - razorpay_secret
+    - razorpay_webhook_secret
+  networks: [database, proxy, outbound]
+  logging: &logging
+    driver: json-file
+    options: {max-size: '10m', max-file: '3'}
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: promptengine
+      POSTGRES_USER: promptengine
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U promptengine -d promptengine']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+  migrate:
+    <<: *api
+    command: [flask, --app, wsgi, db, upgrade]
+    restart: 'no'
+    healthcheck: {disable: true}
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *api
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      db: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+  web:
+    image: promptengine-web:${RELEASE_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    user: '101:101'
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m,uid=101,gid=101
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in .deploy.env}
+      NGINX_ENVSUBST_FILTER: '^PUBLIC_DOMAIN$$'
+      NGINX_ENTRYPOINT_QUIET_LOGS: '1'
+    ports:
+      - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:8080'
+      - '${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:8443'
+    volumes:
+      - type: bind
+        source: ${TLS_CERT_DIR:-./deploy/tls}/fullchain.pem
+        target: /etc/nginx/tls/fullchain.pem
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${TLS_CERT_DIR:-./deploy/tls}/privkey.pem
+        target: /etc/nginx/tls/privkey.pem
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [proxy, edge]
+    logging: *logging
+networks:
+  database: {internal: true}
+  proxy: {internal: true}
+  outbound: {}
+  edge: {}
+volumes:
+  postgres_data: {}
+secrets:
+  postgres_password: {file: ./deploy/secrets/postgres_password}
+  session_secret: {file: ./deploy/secrets/session_secret}
+  jwt_secret: {file: ./deploy/secrets/jwt_secret}
+  openai_key: {file: ./deploy/secrets/openai_key}
+  google_secret: {file: ./deploy/secrets/google_secret}
+  microsoft_secret: {file: ./deploy/secrets/microsoft_secret}
+  razorpay_secret: {file: ./deploy/secrets/razorpay_secret}
+  razorpay_webhook_secret: {file: ./deploy/secrets/razorpay_webhook_secret}
