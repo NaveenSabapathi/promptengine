@@ -2,12 +2,12 @@
 
 A preset-driven prompt workspace and companion Chrome/Firefox extension.
 
-**Phases 1 and 2 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
+**Phases 1–3 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
 OpenID Connect authentication, revocable web sessions, extension pairing, scoped
 extension tokens, atomic daily AI quotas, saved prompt APIs, six presets, OpenAI refinement,
-local compiling, and content-free token metrics.
+local compiling, content-free token metrics, Razorpay subscriptions/webhooks, and custom presets.
 
-This is the backend foundation, **not the completed SaaS**. Payments, React screens, browser extension packaging, and production deployment are the next
+This is the backend foundation, **not the completed SaaS**. React screens, browser extension packaging, and production deployment are the next
 approved phases. No fake AI, OAuth, or payment responses are served.
 
 ## Repository layout
@@ -22,6 +22,7 @@ approved phases. No fake AI, OAuth, or payment responses are served.
 | `packages/shared-types/src/index.ts` | TypeScript API contracts |
 | `docs/phase-1.md` | Auth, quota, pairing and OAuth setup |
 | `docs/phase-2.md` | Presets, AI/local compilation and token metric contracts |
+| `docs/phase-3.md` | Billing, verified webhooks, custom presets and free launch policy |
 
 ## Run the API
 
@@ -82,3 +83,6 @@ and TypeScript checks. See [Phase 1 guide](docs/phase-1.md) for configuration an
 
 Configure `OPENAI_API_KEY` for `/api/refine`; `/api/compile` uses no AI quota or model calls.
 See the [Phase 2 guide](docs/phase-2.md) for token-accounting boundaries and provider setup.
+
+Paid checkout is disabled by default (`BILLING_ENABLED=false`). See the [Phase 3 guide](docs/phase-3.md)
+for test-mode setup, draft pricing, reconciliation and paid-launch requirements.

@@ -1,4 +1,7 @@
 from dataclasses import asdict, dataclass
+from uuid import UUID
+
+from flask import g, has_request_context
 
 from .errors import APIError
 
@@ -153,6 +156,29 @@ PRESETS = {
 
 
 def get_preset(preset_id):
+    if preset_id.startswith("custom_") and has_request_context() and g.get("user"):
+        from .custom_presets import as_preset, require_custom_access
+        from .extensions import db
+        from .models import CustomPreset
+
+        require_custom_access()
+        cached = g.get("custom_preset")
+        if cached and cached.id == preset_id:
+            return cached
+        try:
+            local_id = UUID(preset_id[7:])
+        except ValueError as exc:
+            raise APIError("invalid_preset", "Invalid custom preset identifier") from exc
+        record = db.session.scalar(
+            db.select(CustomPreset).where(
+                CustomPreset.id == local_id,
+                CustomPreset.user_id == g.user.id,
+            )
+        )
+        if not record:
+            raise APIError("not_found", "Custom preset not found", 404)
+        g.custom_preset = as_preset(record)
+        return g.custom_preset
     preset = PRESETS.get(preset_id)
     if preset is None:
         raise APIError("invalid_preset", "Select one of the six available presets")
