@@ -1,0 +1,15 @@
+.git
+.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/test-results
+**/playwright-report
+.env*
+.deploy.env
+deploy/secrets
+deploy/tls
+backups
+*.zip

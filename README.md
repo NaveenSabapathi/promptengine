@@ -63,7 +63,7 @@ and migrated schema. The API does not create database tables at startup.
 
 For a configured HTTPS environment, start with `APP_ENV=production` and serve
 `gunicorn --bind 0.0.0.0:5000 --workers 2 wsgi:app` behind a trusted reverse proxy.
-Full production Docker/Nginx configuration is Phase 6.
+Use the [Phase 6 deployment guide](docs/phase-6.md) for the production Docker/Gunicorn/Nginx stack.
 
 ## Validation
 
@@ -95,3 +95,7 @@ See [Phase 4 setup and workflows](docs/phase-4.md). Run `npm ci` and `npm run de
 ## Phase 5 browser extension
 
 See [Phase 5 installation and security boundaries](docs/phase-5.md). Build all browser targets with `npm run build:extension`. Chrome loads `apps/extension/dist/chrome`; Firefox loads `dist/firefox` or `dist/firefox-mv2`. Pair with your web workspace and use explicit Insert or Copy actions. No Send action is automated.
+
+## Phase 6 production deployment
+
+See [Phase 6 deployment and recovery](docs/phase-6.md). Initialize private host configuration with `python3 deploy/init.py --domain YOUR_DOMAIN`, install trusted TLS certificates, then build/start with `docker compose --env-file .deploy.env`. The stack runs PostgreSQL, migrations, Gunicorn and Nginx; only Nginx exposes ports. Paid checkout stays disabled by default.

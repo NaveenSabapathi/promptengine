@@ -72,6 +72,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.read.mockResolvedValue({ settings });
   mocks.editor.mockResolvedValue(undefined);
+  mocks.saveEditor.mockResolvedValue(undefined);
   mocks.write.mockResolvedValue(undefined);
   mocks.permission.mockResolvedValue(true);
   mocks.request.mockImplementation(async (path: string) => {
