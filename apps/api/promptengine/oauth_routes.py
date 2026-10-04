@@ -2,7 +2,7 @@ import secrets
 from uuid import UUID
 
 from authlib.integrations.base_client.errors import OAuthError
-from flask import Blueprint, current_app, g, redirect, session
+from flask import Blueprint, current_app, g, jsonify, redirect, request, session
 from joserfc.errors import JoseError
 from requests.exceptions import RequestException
 from sqlalchemy.exc import IntegrityError
@@ -93,11 +93,14 @@ def start_flow(provider, linking=False):
         "link_session_id": str(g.auth_record.id) if linking else None,
     }
     try:
-        return client.authorize_redirect(
+        response = client.authorize_redirect(
             current_app.config["API_ORIGIN"] + f"/api/auth/{provider}/callback",
             nonce=nonce,
             prompt="select_account" if provider == "microsoft" else "consent",
         )
+        if linking and request.accept_mimetypes.best == "application/json":
+            return jsonify(authorization_url=response.location)
+        return response
     except RequestException as exc:
         session.clear()
         raise APIError(

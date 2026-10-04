@@ -2,13 +2,12 @@
 
 A preset-driven prompt workspace and companion Chrome/Firefox extension.
 
-**Phases 1–3 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
+**Phases 1–4 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
 OpenID Connect authentication, revocable web sessions, extension pairing, scoped
 extension tokens, atomic daily AI quotas, saved prompt APIs, six presets, OpenAI refinement,
-local compiling, content-free token metrics, Razorpay subscriptions/webhooks, and custom presets.
+local compiling, content-free token metrics, Razorpay subscriptions/webhooks, custom presets, and a responsive React workspace with history and billing.
 
-This is the backend foundation, **not the completed SaaS**. React screens, browser extension packaging, and production deployment are the next
-approved phases. No fake AI, OAuth, or payment responses are served.
+The web application and API are implemented. Browser extension packaging (Phase 5) and production deployment (Phase 6) remain. No fake AI, OAuth, or payment responses are served.
 
 ## Repository layout
 
@@ -17,12 +16,13 @@ approved phases. No fake AI, OAuth, or payment responses are served.
 | `apps/api/promptengine/` | Flask app factory, PostgreSQL models and real API handlers |
 | `apps/api/migrations/` | Versioned Alembic upgrade and downgrade |
 | `apps/api/tests/` | Integration and security tests using actual PostgreSQL |
-| `apps/web/` | Reserved React/Vite workspace (Phase 4) |
+| `apps/web/` | React/Vite web application (Phase 4) |
 | `apps/extension/` | Reserved Chrome/Firefox workspace (Phase 5) |
 | `packages/shared-types/src/index.ts` | TypeScript API contracts |
 | `docs/phase-1.md` | Auth, quota, pairing and OAuth setup |
 | `docs/phase-2.md` | Presets, AI/local compilation and token metric contracts |
 | `docs/phase-3.md` | Billing, verified webhooks, custom presets and free launch policy |
+| `docs/phase-4.md` | Web application, provider login, browser tests and setup |
 
 ## Run the API
 
@@ -79,10 +79,14 @@ npm run typecheck
 ```
 
 GitHub Actions runs PostgreSQL integration tests, migration checks, Python lint/format,
-and TypeScript checks. See [Phase 1 guide](docs/phase-1.md) for configuration and boundaries.
+TypeScript checks, frontend tests, production builds, and browser workflows. See [Phase 1 guide](docs/phase-1.md) for configuration and boundaries.
 
 Configure `OPENAI_API_KEY` for `/api/refine`; `/api/compile` uses no AI quota or model calls.
 See the [Phase 2 guide](docs/phase-2.md) for token-accounting boundaries and provider setup.
 
 Paid checkout is disabled by default (`BILLING_ENABLED=false`). See the [Phase 3 guide](docs/phase-3.md)
 for test-mode setup, draft pricing, reconciliation and paid-launch requirements.
+
+## Phase 4 web application
+
+See [Phase 4 setup and workflows](docs/phase-4.md). Run `npm ci` and `npm run dev` from the repository root after starting Flask/PostgreSQL. Production build: `npm run build` (`apps/web/dist`). Provider credentials stay in the API environment.

@@ -1,6 +1,20 @@
 {
-  "name": "promptengine", "private": true, "version": "0.1.0",
-  "workspaces": ["apps/web", "apps/extension", "packages/shared-types"],
-  "scripts": {"typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json"},
-  "devDependencies": {"typescript": "^5.9.3"}
+  "name": "promptengine",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "apps/extension",
+    "packages/shared-types"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json && npm run typecheck --workspace @promptengine/web",
+    "dev": "npm run dev --workspace @promptengine/web",
+    "build": "npm run build --workspace @promptengine/web",
+    "test:web": "npm test --workspace @promptengine/web"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3"
+  }
 }

@@ -1,4 +1,4 @@
-name: Phase 1 validation
+name: Application validation
 on:
   push:
   pull_request:
@@ -54,3 +54,52 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:web
+
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: promptengine_browser_test
+          POSTGRES_USER: promptengine
+          POSTGRES_PASSWORD: integration-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U promptengine -d promptengine_browser_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      APP_ENV: development
+      SECRET_KEY: browser-ci-session-secret-at-least-32-characters
+      JWT_SECRET_KEY: browser-ci-distinct-jwt-secret-at-least-32-characters
+      DATABASE_URL: postgresql+psycopg://promptengine:integration-test-only@localhost:5432/promptengine_browser_test
+      WEB_ORIGIN: http://localhost:5173
+      API_ORIGIN: http://localhost:5000
+      BILLING_ENABLED: 'false'
+      OPENAI_API_KEY: ''
+      GOOGLE_CLIENT_ID: ''
+      GOOGLE_CLIENT_SECRET: ''
+      MICROSOFT_CLIENT_ID: ''
+      MICROSOFT_CLIENT_SECRET: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m venv .venv
+      - run: .venv/bin/pip install -r apps/api/requirements.lock.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e --workspace @promptengine/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-traces
+          path: apps/web/test-results

@@ -273,3 +273,19 @@ def test_actual_microsoft_signed_token_checks_tenant_issuer_and_audience(
                     )
     finally:
         app.config.update(previous)
+
+
+def test_spa_link_returns_authorization_url_preserving_state_and_csrf(client, google):
+    signup(client)
+    headers = {**web_headers(client), "Accept": "application/json"}
+    response = client.post("/api/auth/google/link", json={}, headers=headers)
+    assert response.status_code == 200
+    query = parse_qs(urlparse(response.json["authorization_url"]).query)
+    assert query["state"][0]
+    assert query["nonce"][0]
+    assert query["code_challenge_method"] == ["S256"]
+    with client.session_transaction() as state:
+        assert state["oauth_flow"]["link_user_id"]
+        assert state["oauth_flow"]["nonce"] == query["nonce"][0]
+    headers.pop("X-CSRF-TOKEN")
+    assert client.post("/api/auth/google/link", json={}, headers=headers).status_code == 401
