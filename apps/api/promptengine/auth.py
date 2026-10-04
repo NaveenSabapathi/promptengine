@@ -1,12 +1,12 @@
 from email_validator import EmailNotValidError, validate_email
-from flask import Blueprint, g, jsonify
+from flask import Blueprint, current_app, g, jsonify
 from flask_jwt_extended import unset_jwt_cookies
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .errors import APIError
 from .extensions import db
-from .models import Entitlement, User
+from .models import Entitlement, OAuthIdentity, User
 from .security import (
     json_body,
     login_response,
@@ -51,6 +51,20 @@ def create_user(email, password_hash=None):
     return user
 
 
+@bp.get("/capabilities")
+def capabilities():
+    return jsonify(
+        providers={
+            provider: bool(
+                current_app.config[f"{provider.upper()}_CLIENT_ID"]
+                and current_app.config[f"{provider.upper()}_CLIENT_SECRET"]
+            )
+            for provider in ("google", "microsoft")
+        },
+        ai_enabled=bool(current_app.config["OPENAI_API_KEY"]),
+    )
+
+
 @bp.post("/signup")
 def signup():
     require_web_origin()
@@ -88,7 +102,14 @@ def login():
 @bp.get("/me")
 @requires_auth(web_only=True)
 def me():
-    return jsonify(user=user_payload(g.user))
+    return jsonify(
+        user=user_payload(g.user),
+        linked_providers=list(
+            db.session.scalars(
+                db.select(OAuthIdentity.provider).where(OAuthIdentity.user_id == g.user.id)
+            )
+        ),
+    )
 
 
 @bp.post("/logout")

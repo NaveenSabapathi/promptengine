@@ -54,6 +54,15 @@ def create_app(test_config=None):
     @app.errorhandler(APIError)
     def api_error(error):
         db.session.rollback()
+        if (
+            request.path in {"/api/auth/google/callback", "/api/auth/microsoft/callback"}
+            and request.accept_mimetypes["text/html"] > request.accept_mimetypes["application/json"]
+        ):
+            from urllib.parse import urlencode
+
+            from flask import redirect
+
+            return redirect(app.config["WEB_ORIGIN"] + "/login?" + urlencode({"error": error.code}))
         return error_response(error.code, error.message, error.status)
 
     @app.errorhandler(HTTPException)
