@@ -142,7 +142,7 @@ class GenerationMetric(db.Model):
     __tablename__ = "generation_metrics"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    preset_id: Mapped[str] = mapped_column(db.String(40))
+    preset_id: Mapped[str] = mapped_column(db.String(80))
     preset_version: Mapped[str] = mapped_column(db.String(40))
     engine: Mapped[str] = mapped_column(db.String(16))
     mode: Mapped[str] = mapped_column(db.String(16))
@@ -172,4 +172,81 @@ class GenerationMetric(db.Model):
             "provider_output_tokens IS NULL OR provider_output_tokens >= 0", name="output_tokens"
         ),
         CheckConstraint("latency_ms >= 0", name="latency"),
+    )
+
+
+class BillingSubscription(db.Model):
+    __tablename__ = "billing_subscriptions"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    razorpay_id: Mapped[str | None] = mapped_column(db.String(100), unique=True)
+    plan_id: Mapped[str] = mapped_column(db.String(100))
+    amount_paise: Mapped[int] = mapped_column(db.Integer)
+    currency: Mapped[str] = mapped_column(db.String(3), server_default="INR")
+    status: Mapped[str] = mapped_column(db.String(20), server_default="creating")
+    checkout_url: Mapped[str | None] = mapped_column(db.String(500))
+    current_end: Mapped[datetime | None] = mapped_column(db.DateTime(timezone=True))
+    last_event_at: Mapped[int] = mapped_column(db.BigInteger, server_default="0")
+    cancel_at_cycle_end: Mapped[bool] = mapped_column(db.Boolean, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        db.DateTime(timezone=True), server_default=func.now()
+    )
+    __table_args__ = (
+        Index("ix_billing_subscriptions_user_created", "user_id", "created_at"),
+        Index(
+            "uq_billing_subscriptions_open_user",
+            "user_id",
+            unique=True,
+            postgresql_where=db.text(
+                "status IN ('creating','uncertain','created','authenticated',"
+                "'active','pending','halted')"
+            ),
+        ),
+        CheckConstraint("amount_paise > 0", name="positive_amount"),
+        CheckConstraint("currency = 'INR'", name="currency"),
+        CheckConstraint(
+            "status IN ('creating','uncertain','failed','created','authenticated',"
+            "'active','pending','halted','cancelled','completed','expired')",
+            name="status",
+        ),
+    )
+
+
+class BillingWebhook(db.Model):
+    __tablename__ = "billing_webhooks"
+    event_id: Mapped[str] = mapped_column(db.String(128), primary_key=True)
+    payload_hash: Mapped[str] = mapped_column(db.String(64), unique=True)
+    event_type: Mapped[str] = mapped_column(db.String(80))
+    subscription_id: Mapped[str | None] = mapped_column(db.String(100))
+    outcome: Mapped[str] = mapped_column(db.String(32))
+    received_at: Mapped[datetime] = mapped_column(
+        db.DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class BillingPayment(db.Model):
+    __tablename__ = "billing_payments"
+    payment_id: Mapped[str] = mapped_column(db.String(100), primary_key=True)
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("billing_subscriptions.id", ondelete="CASCADE"), index=True
+    )
+    amount_paise: Mapped[int] = mapped_column(db.Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        db.DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CustomPreset(db.Model):
+    __tablename__ = "custom_presets"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(db.String(100))
+    role: Mapped[str] = mapped_column(db.String(200))
+    required_fields: Mapped[dict] = mapped_column(db.JSON)
+    optional_fields: Mapped[dict] = mapped_column(db.JSON)
+    output_constraints: Mapped[list] = mapped_column(db.JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        db.DateTime(timezone=True), server_default=func.now()
     )

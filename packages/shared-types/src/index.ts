@@ -28,8 +28,9 @@ export interface ExtensionDevice {
   id: string; device_name: string; scopes: ExtensionScope[]; expires_at: string; revoked: boolean;
 }
 
-export type PresetId = 'coding' | 'website_briefs' | 'business_proposals' |
+export type DefaultPresetId = 'coding' | 'website_briefs' | 'business_proposals' |
   'marketing' | 'research' | 'professional_comm';
+export type PresetId = DefaultPresetId | `custom_${string}`;
 export type PromptTone = 'professional' | 'concise' | 'friendly' | 'technical' | 'persuasive';
 export type CompileMode = 'Build' | 'Compact';
 export type GenerationEngine = 'ai' | 'local';
@@ -59,3 +60,24 @@ export interface MetricsGroup {
   token_difference: number; provider_input_tokens: number | null; provider_output_tokens: number | null;
 }
 export interface MetricsSummary { days: number; scope: 'plain_text_only'; groups: MetricsGroup[] }
+
+export type SubscriptionStatus = 'creating' | 'uncertain' | 'failed' | 'created' |
+  'authenticated' | 'active' | 'pending' | 'halted' | 'cancelled' | 'completed' | 'expired';
+export interface BillingSubscription {
+  id: string; razorpay_subscription_id: string | null; status: SubscriptionStatus;
+  checkout_url: string | null; current_end: string | null; cancel_at_cycle_end: boolean;
+  amount_paise: number; currency: 'INR';
+}
+export interface BillingStatus {
+  plan_tier: PlanTier; daily_ai_limit: number; billing_enabled: boolean;
+  subscription: BillingSubscription | null;
+}
+export interface BillingPlan {
+  tier: PlanTier; amount_paise: number; currency: 'INR'; period?: 'monthly';
+  daily_ai_limit: number; local_compiling: boolean; custom_presets: boolean;
+}
+export interface BillingPlanList { billing_enabled: boolean; plans: BillingPlan[] }
+export interface CustomPresetInput {
+  name: string; role: string; required_fields: Record<string, string>;
+  optional_fields?: Record<string, string>; output_constraints: string[];
+}

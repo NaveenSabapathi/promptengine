@@ -23,13 +23,32 @@ def create_app(test_config=None):
     jwt.init_app(app)
     oauth.init_app(app)
 
-    from . import auth, generation, oauth_routes, pairing, prompts
+    from . import (
+        auth,
+        billing,
+        custom_presets,
+        generation,
+        oauth_routes,
+        pairing,
+        prompts,
+        webhooks,
+    )
     from .entitlements import effective_entitlement
     from .models import ExtensionToken, PairingRequest, RateLimitBucket, UsageLedger, WebSession
     from .security import now, requires_auth
 
     oauth_routes.register_oauth(app)
-    for blueprint in (auth.bp, oauth_routes.bp, pairing.bp, prompts.bp, generation.bp):
+    billing.register_commands(app)
+    for blueprint in (
+        auth.bp,
+        oauth_routes.bp,
+        pairing.bp,
+        prompts.bp,
+        generation.bp,
+        billing.bp,
+        custom_presets.bp,
+        webhooks.bp,
+    ):
         app.register_blueprint(blueprint)
 
     @app.errorhandler(APIError)

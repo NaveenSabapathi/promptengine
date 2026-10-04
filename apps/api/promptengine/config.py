@@ -44,6 +44,18 @@ def configuration():
     timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "20"))
     if not 1 <= timeout <= 25:
         raise RuntimeError("OPENAI_TIMEOUT_SECONDS must be between 1 and 25")
+    billing_enabled = os.getenv("BILLING_ENABLED", "false").lower()
+    if billing_enabled not in {"true", "false"}:
+        raise RuntimeError("BILLING_ENABLED must be true or false")
+    pro_limit = int(os.getenv("PRO_DAILY_AI_LIMIT", "100"))
+    pro_price = int(os.getenv("PRO_PRICE_PAISE", "49900"))
+    total_count = int(os.getenv("RAZORPAY_TOTAL_COUNT", "120"))
+    if (
+        not 10 < pro_limit <= 10000
+        or not 100 <= pro_price <= 100000000
+        or not 1 <= total_count <= 1200
+    ):
+        raise RuntimeError("Invalid Pro quota, price or billing-cycle configuration")
     return {
         "APP_ENV": environment,
         "SECRET_KEY": secret,
@@ -78,6 +90,14 @@ def configuration():
         "OPENAI_TIMEOUT_SECONDS": timeout,
         "OPENAI_MAX_OUTPUT_TOKENS": 4096,
         "MAX_TASK_TOKENS": 12000,
+        "BILLING_ENABLED": billing_enabled == "true",
+        "RAZORPAY_KEY_ID": os.getenv("RAZORPAY_KEY_ID", ""),
+        "RAZORPAY_KEY_SECRET": os.getenv("RAZORPAY_KEY_SECRET", ""),
+        "RAZORPAY_PRO_PLAN_ID": os.getenv("RAZORPAY_PRO_PLAN_ID", ""),
+        "RAZORPAY_WEBHOOK_SECRET": os.getenv("RAZORPAY_WEBHOOK_SECRET", ""),
+        "RAZORPAY_TOTAL_COUNT": total_count,
+        "PRO_DAILY_AI_LIMIT": pro_limit,
+        "PRO_PRICE_PAISE": pro_price,
         "FREE_DAILY_AI_LIMIT": 10,
         "EXTENSION_TOKEN_DAYS": 30,
         "TRUST_PROXY": os.getenv("TRUST_PROXY", "false").lower() == "true",
