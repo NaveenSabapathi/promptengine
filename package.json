@@ -1,0 +1,6 @@
+{
+  "name": "promptengine", "private": true, "version": "0.1.0",
+  "workspaces": ["apps/web", "apps/extension", "packages/shared-types"],
+  "scripts": {"typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json"},
+  "devDependencies": {"typescript": "^5.9.3"}
+}
