@@ -171,3 +171,13 @@ def revoke_token(token_id):
     record.revoked_at = now()
     db.session.commit()
     return jsonify(ok=True)
+
+
+@bp.post("/disconnect")
+@requires_auth()
+def disconnect_extension():
+    if g.auth_kind != "extension":
+        raise APIError("extension_token_required", "Use the browser token to disconnect", 403)
+    g.auth_record.revoked_at = now()
+    db.session.commit()
+    return jsonify(ok=True)

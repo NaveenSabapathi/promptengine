@@ -8,10 +8,12 @@
     "packages/shared-types"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json && npm run typecheck --workspace @promptengine/web",
+    "typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json && npm run typecheck --workspace @promptengine/web && npm run typecheck --workspace @promptengine/extension",
     "dev": "npm run dev --workspace @promptengine/web",
     "build": "npm run build --workspace @promptengine/web",
-    "test:web": "npm test --workspace @promptengine/web"
+    "test:web": "npm test --workspace @promptengine/web",
+    "build:extension": "npm run build --workspace @promptengine/extension",
+    "test:extension": "npm test --workspace @promptengine/extension"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

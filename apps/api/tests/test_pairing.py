@@ -111,3 +111,27 @@ def test_concurrent_exchange_only_issues_one_token(app, client):
     assert results.count(400) == 4
     with app.app_context():
         assert db.session.scalar(db.select(db.func.count()).select_from(ExtensionToken)) == 1
+
+
+def test_extension_can_revoke_only_its_own_access(client):
+    from conftest import signup, web_headers
+
+    signup(client)
+    pairing = client.post("/api/extension/pairing", json={"device_name": "Self revoke"}).json
+    client.post(
+        "/api/extension/pairing/approve",
+        json={"code": pairing["code"]},
+        headers=web_headers(client),
+    )
+    token = client.post(
+        "/api/extension/pairing/exchange",
+        json={key: pairing[key] for key in ("pairing_id", "code", "device_secret")},
+    ).json["access_token"]
+    headers = {"Authorization": "Bearer " + token}
+    assert client.post("/api/extension/disconnect", json={}, headers=headers).status_code == 200
+    assert client.get("/api/usage", headers=headers).status_code == 401
+    assert (
+        client.post("/api/extension/disconnect", json={}, headers=web_headers(client)).status_code
+        == 403
+    )
+    assert client.get("/api/auth/me").status_code == 200

@@ -56,6 +56,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm run test:web
+      - run: npm run build:extension
+      - run: npm run test:extension
+      - run: npm run lint:firefox --workspace @promptengine/extension
 
   browser:
     runs-on: ubuntu-latest
@@ -98,8 +101,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e --workspace @promptengine/web
+      - run: npm run build:extension
+      - run: npm run test:browser --workspace @promptengine/extension
+      - run: npm run test:installed --workspace @promptengine/extension
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: browser-failure-traces
-          path: apps/web/test-results
+          path: |
+            apps/web/test-results
+            apps/extension/test-results
