@@ -126,7 +126,12 @@ def paid_conversion(user_id, payment):
 @bp.get("")
 @requires_auth(web_only=True)
 def rewards():
-    user = db.session.scalar(db.select(User).where(User.id == g.user.id).with_for_update())
+    user = db.session.scalar(
+        db.select(User)
+        .where(User.id == g.user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if not user.referral_code:
         user.referral_code = secrets.token_urlsafe(18)
     balance = db.session.get(ReferralBalance, user.id)
