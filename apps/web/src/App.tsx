@@ -44,7 +44,13 @@ function Shell() {
       </div>
     );
   if (!auth.user)
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.hash }}
+      />
+    );
   async function logout() {
     setBusy(true);
     try {

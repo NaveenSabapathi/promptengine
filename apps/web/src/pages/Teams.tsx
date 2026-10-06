@@ -31,7 +31,8 @@ export default function Teams() {
     refresh()
       .then(loadMembers)
       .catch((e) => setError(errorText(e)));
-    if (location.hash) history.replaceState(null, "", location.pathname);
+    if (location.hash)
+      history.replaceState(history.state, "", location.pathname);
   }, []);
   async function run(action: () => Promise<void>) {
     setBusy(true);

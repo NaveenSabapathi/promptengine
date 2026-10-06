@@ -41,7 +41,7 @@ export default function Login({ signup = false }: { signup?: boolean }) {
   const [show, setShow] = useState(false);
   const from =
     typeof location.state?.from === "string" &&
-    /^\/(workspace|history|presets|settings)(\/extensions)?$/.test(
+    /^\/(workspace|history|presets|settings|security|rewards|admin|teams)(\/extensions|#invite=[A-Za-z0-9_-]{20,100})?$/.test(
       location.state.from,
     )
       ? location.state.from
