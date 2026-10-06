@@ -27,5 +27,8 @@ jobs:
           script_stop: true
           envs: GITHUB_SHA,GITHUB_ACTOR
           script: |
+            cd /opt/promptengine
+            git fetch origin main
+            git reset --hard origin/main
             chmod +x /opt/promptengine/deploy/deploy.sh
             /opt/promptengine/deploy/deploy.sh "${GITHUB_SHA}" "${GITHUB_ACTOR}"
