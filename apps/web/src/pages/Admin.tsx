@@ -5,6 +5,34 @@ import { api, post, csrfToken, errorText } from "@/lib/api";
 import { Notice } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+type Overview = {
+  accounts: number;
+  active_accounts: number;
+  usage_today: number;
+  telemetry: {
+    requests: number;
+    failures: number;
+    failure_rate: number;
+    provider_latency_ms: number | string | null;
+  };
+  tokens: { input_tokens: number; output_tokens: number; token_delta: number };
+};
+type Referral = {
+  id: string;
+  referrer_id: string;
+  referee_id: string;
+  status: string;
+  blocked_reason: string | null;
+  registration_days: number;
+  conversion_days: number;
+};
+type Audit = {
+  id: string;
+  created_at: string;
+  action: string;
+  target: string;
+  details: Record<string, unknown>;
+};
 type Account = {
   id: string;
   email: string;
@@ -20,11 +48,11 @@ type Dataset = {
 };
 export default function Admin() {
   const auth = useAuth();
-  const [overview, setOverview] = useState<Record<string, unknown>>();
+  const [overview, setOverview] = useState<Overview>();
   const [users, setUsers] = useState<Account[]>([]);
   const [email, setEmail] = useState("");
-  const [audit, setAudit] = useState<unknown[]>([]);
-  const [referrals, setReferrals] = useState<unknown[]>([]);
+  const [audit, setAudit] = useState<Audit[]>([]);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
   const [dataset, setDataset] = useState<Dataset[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,12 +70,12 @@ export default function Admin() {
   const [coupon, setCoupon] = useState("");
   async function refresh() {
     const [o, u, a, r, d] = await Promise.all([
-      api<Record<string, unknown>>("/api/admin/overview"),
+      api<Overview>("/api/admin/overview"),
       api<{ users: Account[] }>(
         "/api/admin/users?email=" + encodeURIComponent(email),
       ),
-      api<{ logs: unknown[] }>("/api/admin/audit"),
-      api<{ referrals: unknown[] }>("/api/admin/referrals"),
+      api<{ logs: Audit[] }>("/api/admin/audit"),
+      api<{ referrals: Referral[] }>("/api/admin/referrals"),
       api<{ logs: Dataset[] }>("/api/admin/dataset"),
     ]);
     setOverview(o);
@@ -69,7 +97,12 @@ export default function Admin() {
     }
   }
   useEffect(() => {
-    if (auth.user?.is_admin) refresh().catch((e) => setError(errorText(e)));
+    if (!auth.user?.is_admin) return;
+    refresh().catch((e) => setError(errorText(e)));
+    const timer = setInterval(() => {
+      refresh().catch((e) => setError(errorText(e)));
+    }, 30000);
+    return () => clearInterval(timer);
   }, [auth.user?.is_admin]);
   if (!auth.user?.is_admin) return <p>Administrator access required.</p>;
   return (
@@ -85,7 +118,32 @@ export default function Admin() {
       </Button>
       <section className="card">
         <h2>Accounts, quota & provider telemetry</h2>
-        {overview && <pre>{JSON.stringify(overview, null, 2)}</pre>}
+        {overview && (
+          <div className="enterprise-metrics">
+            {[
+              ["Total accounts", overview.accounts],
+              ["Active accounts", overview.active_accounts],
+              ["AI requests today", overview.usage_today],
+              [
+                "API failure rate",
+                (overview.telemetry.failure_rate * 100).toFixed(2) + "%",
+              ],
+              [
+                "Provider latency",
+                Number(overview.telemetry.provider_latency_ms || 0).toFixed(0) +
+                  " ms",
+              ],
+              ["Provider input tokens", overview.tokens.input_tokens],
+              ["Provider output tokens", overview.tokens.output_tokens],
+              ["Prompt token delta", overview.tokens.token_delta],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        )}
         <p>
           Active accounts have a non-revoked web session. Failure rates and
           token deltas cover the last 24 hours.
@@ -286,7 +344,28 @@ export default function Admin() {
       </section>
       <section className="card">
         <h2>Referral ledger</h2>
-        <pre>{JSON.stringify(referrals, null, 2)}</pre>
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer</th>
+              <th>Referee</th>
+              <th>Status</th>
+              <th>Days granted</th>
+              <th>Risk review</th>
+            </tr>
+          </thead>
+          <tbody>
+            {referrals.map((r) => (
+              <tr key={r.id}>
+                <td>{r.referrer_id}</td>
+                <td>{r.referee_id}</td>
+                <td>{r.status}</td>
+                <td>{r.registration_days + r.conversion_days}</td>
+                <td>{r.blocked_reason || "Passed checks"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
       <section className="card">
         <h2>Dataset quality & export</h2>
@@ -380,7 +459,26 @@ export default function Admin() {
       </section>
       <section className="card">
         <h2>Audit trail</h2>
-        <pre>{JSON.stringify(audit, null, 2)}</pre>
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {audit.map((r) => (
+              <tr key={r.id}>
+                <td>{new Date(r.created_at).toLocaleString()}</td>
+                <td>{r.action}</td>
+                <td>{r.target}</td>
+                <td>{JSON.stringify(r.details)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </>
   );

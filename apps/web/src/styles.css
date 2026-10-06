@@ -1842,3 +1842,81 @@
     }
   }
 }
+
+/* Enterprise settings reuse the workspace palette and keep dense data readable. */
+@layer components {
+  .card {
+    background: var(--background);
+    border: 1px solid var(--input);
+    border-radius: 12px;
+    padding: 24px;
+    margin-block: 20px;
+    overflow-x: auto;
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 20px;
+    letter-spacing: -0.025em;
+  }
+  .card p {
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .card > label {
+    display: block;
+    margin: 18px 0 7px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .card > input,
+  .card > select {
+    max-width: 520px;
+    display: block;
+  }
+  .card select {
+    background: white;
+    border: 1px solid var(--input);
+    border-radius: 7px;
+    padding: 9px 12px;
+  }
+  .card > button,
+  .card td button {
+    margin: 12px 8px 0 0;
+  }
+  .card pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    background: var(--muted);
+    padding: 16px;
+    border-radius: 8px;
+    max-height: 420px;
+    overflow: auto;
+  }
+  .card a {
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+  }
+  .enterprise-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 14px;
+  }
+  .enterprise-metrics > div {
+    border: 1px solid var(--input);
+    padding: 18px;
+    border-radius: 9px;
+  }
+  .enterprise-metrics span {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    display: block;
+  }
+  .enterprise-metrics strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 25px;
+    letter-spacing: -0.04em;
+  }
+}

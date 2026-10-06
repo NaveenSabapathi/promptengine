@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+mkdir -p "$PGDATA"
+chmod 700 "$PGDATA"
 export PGPASSWORD=$(cat /run/secrets/replication_password)
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
     pg_basebackup -h db -U promptlogic_replica -D "$PGDATA" -R -X stream --checkpoint=fast

@@ -35,7 +35,7 @@ jobs:
         if: failure()
         run: |
           docker compose --env-file .deploy.env ps -a
-          docker compose --env-file .deploy.env logs --no-color --tail 150
+          docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml logs --no-color --tail 150
       - name: Remove disposable containers and data
         if: always()
         run: docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml down -v
