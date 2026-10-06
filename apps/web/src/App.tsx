@@ -26,6 +26,10 @@ import History from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import Extensions from "./pages/Extensions";
 import Presets from "./pages/Presets";
+import SecurityPage from "./pages/Security";
+import Teams from "./pages/Teams";
+import Rewards from "./pages/Rewards";
+import Admin from "./pages/Admin";
 function Shell() {
   const auth = useAuth();
   const location = useLocation();
@@ -59,7 +63,11 @@ function Shell() {
         <div className="team-chip">
           <span className="avatar">{auth.user.email[0].toUpperCase()}</span>
           <div>
-            <strong>Personal workspace</strong>
+            <strong>
+              {sessionStorage.getItem("active-team")
+                ? "Team workspace"
+                : "Personal workspace"}
+            </strong>
             <span>Ideas, with direction.</span>
           </div>
         </div>
@@ -70,6 +78,12 @@ function Shell() {
             ["/history", "Saved prompts", Library],
             ["/presets", "Custom presets", Puzzle],
             ["/settings", "Settings & billing", Settings],
+            ["/security", "Security & privacy", Settings],
+            ["/teams", "Team workspaces", Library],
+            ["/rewards", "Referrals & coupons", Puzzle],
+            ...(auth.user.is_admin
+              ? [["/admin", "Administration", LayoutDashboard]]
+              : []),
           ].map(([path, label, Icon]) => {
             const C = Icon as typeof LayoutDashboard;
             return (
@@ -143,6 +157,10 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/settings/extensions" element={<Extensions />} />
+        <Route path="/security" element={<SecurityPage />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/rewards" element={<Rewards />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/presets" element={<Presets />} />
       </Route>
       <Route

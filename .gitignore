@@ -17,3 +17,6 @@ test-results/
 deploy/secrets/
 deploy/tls/
 backups/
+
+# Host recovery state must never be published.
+deploy/state/

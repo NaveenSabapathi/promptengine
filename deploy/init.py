@@ -45,6 +45,7 @@ def main():
         "BILLING_ENABLED=false\nRAZORPAY_KEY_ID=\nRAZORPAY_PRO_PLAN_ID=\n"
         "PRO_PRICE_PAISE=49900\nPRO_DAILY_AI_LIMIT=100\nRAZORPAY_TOTAL_COUNT=120\n"
     )
+    subprocess.run(["python3", str(root / "deploy/enterprise-init.py")], check=True)
     tls = root / "deploy/tls"
     tls.mkdir(mode=0o700, exist_ok=True)
     if args.self_signed:

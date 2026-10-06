@@ -4,6 +4,7 @@ from .errors import APIError
 from .extensions import db
 from .models import SavedPrompt
 from .security import json_body, requires_auth, text_field
+from .teams import asset_scope, manage_assets
 
 bp = Blueprint("prompts", __name__, url_prefix="/api/prompts")
 
@@ -35,7 +36,7 @@ def owned_prompt(prompt_id):
     record = db.session.scalar(
         db.select(SavedPrompt).where(
             SavedPrompt.id == prompt_id,
-            SavedPrompt.user_id == g.user.id,
+            asset_scope(SavedPrompt),
         )
     )
     if record is None:
@@ -53,7 +54,7 @@ def list_prompts():
         raise APIError("invalid_pagination", "page and per_page must be integers") from exc
     if page < 1 or page > 10000 or not 1 <= per_page <= 100:
         raise APIError("invalid_pagination", "Use page 1–10000 and per_page 1–100")
-    query = db.select(SavedPrompt).where(SavedPrompt.user_id == g.user.id)
+    query = db.select(SavedPrompt).where(asset_scope(SavedPrompt))
     search = request.args.get("q", "").strip()
     if len(search) > 200:
         raise APIError("invalid_search", "Search must contain at most 200 characters")
@@ -77,7 +78,7 @@ def list_prompts():
 @bp.post("")
 @requires_auth("prompts:write")
 def create_prompt():
-    record = SavedPrompt(user_id=g.user.id, **prompt_fields(json_body()))
+    record = SavedPrompt(user_id=g.user.id, team_id=g.get("team_id"), **prompt_fields(json_body()))
     db.session.add(record)
     db.session.commit()
     return jsonify(prompt=serialize(record)), 201
@@ -93,6 +94,8 @@ def get_prompt(prompt_id):
 @requires_auth("prompts:write")
 def update_prompt(prompt_id):
     record = owned_prompt(prompt_id)
+    if g.get("team_id") and record.user_id != g.user.id:
+        manage_assets()
     for key, value in prompt_fields(json_body()).items():
         setattr(record, key, value)
     db.session.commit()
@@ -102,6 +105,7 @@ def update_prompt(prompt_id):
 @bp.delete("/<uuid:prompt_id>")
 @requires_auth("prompts:write")
 def delete_prompt(prompt_id):
+    manage_assets()
     db.session.delete(owned_prompt(prompt_id))
     db.session.commit()
     return "", 204

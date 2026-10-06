@@ -64,8 +64,8 @@ export default function App() {
   const [auth, setAuth] = useState<ExtensionAccess>();
   const [pairing, setPairing] = useState<PairingRequest>();
   const [configure, setConfigure] = useState(false);
-  const [apiOrigin, setApiOrigin] = useState("");
-  const [webOrigin, setWebOrigin] = useState("");
+  const [apiOrigin, setApiOrigin] = useState("https://promptlogic.io");
+  const [webOrigin, setWebOrigin] = useState("https://promptlogic.io");
   const [deviceName, setDeviceName] = useState("My browser");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -99,8 +99,8 @@ export default function App() {
         const stored = await readStored();
         if (!alive) return;
         setSettings(stored.settings);
-        setApiOrigin(stored.settings?.apiOrigin || "");
-        setWebOrigin(stored.settings?.webOrigin || "");
+        setApiOrigin(stored.settings?.apiOrigin || "https://promptlogic.io");
+        setWebOrigin(stored.settings?.webOrigin || "https://promptlogic.io");
         setDeviceName(stored.settings?.deviceName || "My browser");
         setConsent(Boolean(stored.settings?.consent));
         setPairing(stored.pairing);
@@ -566,8 +566,11 @@ export default function App() {
                 <Check size={17} />
                 <p>
                   Pairing information and prompts you submit go to this server.
-                  AI refinement also sends your task to its AI provider. Only
-                  Save stores prompt content in your account. No chat history or
+                  AI refinement also sends your task to its AI provider. Save
+                  stores prompt content in your account. If you separately opt
+                  in to training data in the web app, scrubbed personal AI tasks
+                  and generated prompts are also retained for up to 30 days and
+                  may be reviewed/exported by administrators. No chat history or
                   browsing history is sent.
                 </p>
               </div>

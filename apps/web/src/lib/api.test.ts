@@ -97,3 +97,21 @@ it("rejects malformed successful API responses clearly", async () => {
     status: 502,
   });
 });
+
+it("adds the active workspace only to asset and generation requests", async () => {
+  sessionStorage.setItem("active-team", "team-id");
+  const fetcher = vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+  await api("/api/prompts");
+  expect(
+    new Headers(fetcher.mock.calls.at(-1)?.[1]?.headers).get("X-Team-ID"),
+  ).toBe("team-id");
+  await api("/api/billing/status");
+  expect(
+    new Headers(fetcher.mock.calls.at(-1)?.[1]?.headers).get("X-Team-ID"),
+  ).toBeNull();
+  sessionStorage.clear();
+});

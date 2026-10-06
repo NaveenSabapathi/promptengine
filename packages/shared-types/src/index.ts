@@ -6,6 +6,9 @@ export interface APIError {
   error: { code: string; message: string };
 }
 export interface User {
+  is_admin?: boolean;
+  totp_enabled?: boolean;
+  dataset_consent?: boolean;
   id: string;
   email: string;
   created_at: string;

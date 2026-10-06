@@ -1,0 +1,29 @@
+# Optional secondary on the private network; never route application writes here.
+services:
+  db:
+    command: [postgres, -c, wal_level=replica, -c, max_wal_senders=5, -c, wal_keep_size=512MB]
+    volumes:
+      - ./deploy/postgres/020-replication.sh:/docker-entrypoint-initdb.d/020-replication.sh:ro
+  secondary:
+    image: postgres:16-bookworm
+    user: postgres
+    restart: unless-stopped
+    environment:
+      PGDATA: /var/lib/postgresql/data
+    entrypoint: [sh, /standby.sh]
+    secrets: [replication_password]
+    volumes:
+      - secondary_data:/var/lib/postgresql/data
+      - ./deploy/postgres/standby.sh:/standby.sh:ro
+    networks: [database]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'psql -U postgres -d postgres -tAc "SELECT pg_is_in_recovery()" | grep -qx t']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+volumes:
+  secondary_data: {}
+secrets:
+  replication_password: {file: ./deploy/secrets/replication_password}

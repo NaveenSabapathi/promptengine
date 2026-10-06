@@ -24,19 +24,30 @@ def create_app(test_config=None):
     oauth.init_app(app)
 
     from . import (
+        admin,
         auth,
         billing,
         custom_presets,
+        datasets,
+        enterprise_security,
         generation,
         oauth_routes,
         pairing,
         prompts,
+        referrals,
+        teams,
         webhooks,
     )
     from .entitlements import effective_entitlement
     from .models import ExtensionToken, PairingRequest, RateLimitBucket, UsageLedger, WebSession
     from .security import now, requires_auth
+    from .telemetry import register_telemetry
 
+    register_telemetry(app)
+    admin.register_commands(app)
+    datasets.register_commands(app)
+    for feature in (admin, datasets, enterprise_security, referrals, teams):
+        app.register_blueprint(feature.bp)
     oauth_routes.register_oauth(app)
     billing.register_commands(app)
     for blueprint in (
@@ -108,7 +119,9 @@ def create_app(test_config=None):
         if origin == app.config["WEB_ORIGIN"]:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRF-TOKEN"
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, X-CSRF-TOKEN, X-Team-ID"
+            )
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
             response.vary.add("Origin")
         return response
@@ -121,6 +134,8 @@ def create_app(test_config=None):
     def readiness():
         # Verify the schema, not only the TCP connection. Migrations run separately.
         db.session.execute(text("SELECT 1 FROM entitlements LIMIT 1"))
+        db.session.execute(text("SELECT is_admin, totp_enabled FROM users LIMIT 1"))
+        db.session.execute(text("SELECT team_id FROM saved_prompts LIMIT 1"))
         return jsonify(status="ok")
 
     @app.get("/api/usage")

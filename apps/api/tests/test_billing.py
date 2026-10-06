@@ -42,6 +42,7 @@ def billing_provider(app, monkeypatch):
         "creates": 0,
         "timeout_create": False,
         "wrong_price": False,
+        "discount_amount": 39920,
         "subscriptions": {},
         "cancel_status": "cancelled",
     }
@@ -57,6 +58,13 @@ def billing_provider(app, monkeypatch):
                 "interval": 1,
                 "item": {"amount": 10 if state["wrong_price"] else 49900, "currency": "INR"},
             }
+        elif path == "/v1/plans/plan_discount":
+            data = {
+                "id": "plan_discount",
+                "period": "monthly",
+                "interval": 1,
+                "item": {"amount": state["discount_amount"], "currency": "INR"},
+            }
         elif path == "/v1/subscriptions":
             state["creates"] += 1
             if state["timeout_create"]:
@@ -64,7 +72,7 @@ def billing_provider(app, monkeypatch):
             remote = f"sub_fixture{state['creates']}"
             data = {
                 "id": remote,
-                "plan_id": "plan_fixture",
+                "plan_id": body["plan_id"],
                 "status": "created",
                 "short_url": "https://rzp.io/i/fixture",
                 "notes": body["notes"],
@@ -404,3 +412,79 @@ def test_concurrent_checkouts_only_create_one_remote_subscription(app, client, b
     assert results.count(201) == 1
     assert set(results) <= {200, 201, 409}
     assert billing_provider["creates"] == 1
+
+
+def test_referral_conversion_only_on_verified_charge(app, client, billing_provider):
+    from promptengine.models import Referral, ReferralBalance, User
+    from promptengine.referrals import payment_fingerprint
+
+    signup(client)
+    referrer = app.test_client()
+    signup(referrer, "referrer@example.com")
+    with app.app_context():
+        referee = db.session.scalar(db.select(User).where(User.email == "owner@example.com"))
+        owner = db.session.scalar(db.select(User).where(User.email == "referrer@example.com"))
+        owner.ip_hash, owner.device_hash = "referrer-ip", "referrer-device"
+        owner.payment_hash = payment_fingerprint({"method": "upi", "vpa": "referrer@bank"})
+        referee.ip_hash, referee.device_hash = "referee-ip", "referee-device"
+        db.session.add(Referral(referrer_id=owner.id, referee_id=referee.id, status="registered"))
+        db.session.commit()
+        owner_id = owner.id
+    subscription = checkout(client).json["subscription"]
+    event = event_for(subscription)
+    event["payload"]["payment"]["entity"].update(method="upi", vpa="referee@bank")
+    assert send_event(client, event, signature="bad").status_code == 401
+    with app.app_context():
+        assert db.session.get(ReferralBalance, owner_id) is None
+    assert send_event(client, event).status_code == 200
+    assert send_event(client, event).status_code == 200
+    with app.app_context():
+        assert db.session.get(ReferralBalance, owner_id).conversion_days == 10
+        assert db.session.scalar(db.select(Referral.status)) == "converted"
+
+
+def test_coupon_discount_is_a_real_verified_provider_plan(app, client, billing_provider):
+    from promptengine.models import User, WebSession
+
+    signup(client)
+    with app.app_context():
+        user = db.session.scalar(db.select(User))
+        user.is_admin, user.totp_enabled = True, True
+        record = db.session.scalar(db.select(WebSession))
+        record.mfa_at = now()
+        db.session.commit()
+    created = client.post(
+        "/api/admin/coupons",
+        json={
+            "discount_type": "percentage",
+            "discount_value": 20,
+            "razorpay_plan_id": "plan_discount",
+            "max_uses": 2,
+            "expires_in_days": 7,
+        },
+        headers=web_headers(client),
+    )
+    assert created.status_code == 201
+    redeemed = client.post(
+        "/api/rewards/redeem", json={"code": created.json["code"]}, headers=web_headers(client)
+    )
+    assert redeemed.status_code == 201
+    request = {"plan_tier": "pro", "redemption_id": redeemed.json["redemption_id"]}
+    # Provider-side price drift cannot silently charge the undiscounted price.
+    billing_provider["discount_amount"] = 49900
+    assert (
+        client.post("/api/billing/subscribe", json=request, headers=web_headers(client)).status_code
+        == 503
+    )
+    assert billing_provider["creates"] == 0
+    billing_provider["discount_amount"] = 39920
+    checkout_result = client.post(
+        "/api/billing/subscribe", json=request, headers=web_headers(client)
+    )
+    assert checkout_result.status_code == 201
+    subscription = checkout_result.json["subscription"]
+    assert subscription["amount_paise"] == 39920
+    event = event_for(subscription)
+    event["payload"]["subscription"]["entity"]["plan_id"] = "plan_discount"
+    event["payload"]["payment"]["entity"]["amount"] = 39920
+    assert send_event(client, event).status_code == 200

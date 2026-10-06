@@ -9,6 +9,7 @@ from .extensions import db
 from .models import CustomPreset, Entitlement
 from .presets import PRESET_VERSION, Preset
 from .security import json_body, requires_auth, text_field
+from .teams import asset_scope, manage_assets
 
 bp = Blueprint("custom_presets", __name__, url_prefix="/api/custom-presets")
 
@@ -86,7 +87,7 @@ def owned(preset_id):
     record = db.session.scalar(
         db.select(CustomPreset).where(
             CustomPreset.id == preset_id,
-            CustomPreset.user_id == g.user.id,
+            asset_scope(CustomPreset),
         )
     )
     if not record:
@@ -100,7 +101,7 @@ def owned(preset_id):
 def list_custom():
     records = db.session.scalars(
         db.select(CustomPreset)
-        .where(CustomPreset.user_id == g.user.id)
+        .where(asset_scope(CustomPreset))
         .order_by(CustomPreset.created_at.desc())
     ).all()
     return jsonify(
@@ -112,19 +113,18 @@ def list_custom():
 @requires_auth("refine")
 @custom_access
 def create_custom():
+    manage_assets()
     fields = validate_contract(json_body())
     # Serialize per-account creation to enforce a bounded number of custom contracts.
     db.session.execute(
         db.select(Entitlement.user_id).where(Entitlement.user_id == g.user.id).with_for_update()
     )
     count = db.session.scalar(
-        db.select(db.func.count())
-        .select_from(CustomPreset)
-        .where(CustomPreset.user_id == g.user.id)
+        db.select(db.func.count()).select_from(CustomPreset).where(asset_scope(CustomPreset))
     )
     if count >= 50:
         raise APIError("preset_limit", "Up to 50 custom presets are supported", 409)
-    record = CustomPreset(user_id=g.user.id, **fields)
+    record = CustomPreset(user_id=g.user.id, team_id=g.get("team_id"), **fields)
     db.session.add(record)
     db.session.commit()
     return jsonify(preset=as_preset(record).public()), 201
@@ -134,6 +134,7 @@ def create_custom():
 @requires_auth("refine")
 @custom_access
 def update_custom(preset_id):
+    manage_assets()
     record = owned(preset_id)
     for key, value in validate_contract(json_body()).items():
         setattr(record, key, value)
@@ -145,6 +146,7 @@ def update_custom(preset_id):
 @requires_auth("refine")
 def delete_custom(preset_id):
     # Users can delete their data after a downgrade.
+    manage_assets()
     db.session.delete(owned(preset_id))
     db.session.commit()
     return "", 204

@@ -56,7 +56,25 @@ def configuration():
         or not 1 <= total_count <= 1200
     ):
         raise RuntimeError("Invalid Pro quota, price or billing-cycle configuration")
+    from cryptography.fernet import Fernet
+
+    for name in ("TOTP_ENCRYPTION_KEY", "DATASET_ENCRYPTION_KEY"):
+        value = os.getenv(name, "")
+        if value:
+            try:
+                Fernet(value.encode())
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError(f"{name} must be a valid Fernet key") from exc
+    if os.getenv("DATASET_ENABLED", "false").lower() == "true" and not os.getenv(
+        "DATASET_ENCRYPTION_KEY"
+    ):
+        raise RuntimeError("DATASET_ENABLED requires DATASET_ENCRYPTION_KEY")
     return {
+        "TOTP_ENCRYPTION_KEY": os.getenv("TOTP_ENCRYPTION_KEY", ""),
+        "DATASET_ENCRYPTION_KEY": os.getenv("DATASET_ENCRYPTION_KEY", ""),
+        "DATASET_ENABLED": os.getenv("DATASET_ENABLED", "false").lower() == "true",
+        "MAIL_HOOK_URL": os.getenv("MAIL_HOOK_URL", ""),
+        "MAIL_HOOK_SECRET": os.getenv("MAIL_HOOK_SECRET", ""),
         "APP_ENV": environment,
         "SECRET_KEY": secret,
         "JWT_SECRET_KEY": jwt_secret,

@@ -39,7 +39,14 @@ def password_value(data, signup=False):
 
 
 def user_payload(user):
-    return {"id": str(user.id), "email": user.email, "created_at": user.created_at.isoformat()}
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "created_at": user.created_at.isoformat(),
+        "is_admin": user.is_admin,
+        "totp_enabled": user.totp_enabled,
+        "dataset_consent": user.dataset_consent,
+    }
 
 
 def create_user(email, password_hash=None):
@@ -70,10 +77,15 @@ def signup():
     require_web_origin()
     rate_limit("signup", 5)
     data = json_body()
+    if set(data) - {"email", "password", "code", "referral_code", "device_id"}:
+        raise APIError("invalid_field", "Unexpected account field")
     email = normalized_email(data.get("email"))
     password = password_value(data, signup=True)
     try:
         user = create_user(email, generate_password_hash(password))
+        from .referrals import register_referral
+
+        register_referral(user, data)
         response = login_response(user, jsonify(user=user_payload(user)))
         return response, 201
     except IntegrityError as exc:
@@ -88,6 +100,8 @@ def login():
     require_web_origin()
     rate_limit("login_ip", 20)
     data = json_body()
+    if set(data) - {"email", "password", "code", "referral_code", "device_id"}:
+        raise APIError("invalid_field", "Unexpected account field")
     email = normalized_email(data.get("email"))
     password = password_value(data)
     rate_limit("login_account", 10, seconds=900, identity=email)
@@ -96,7 +110,15 @@ def login():
     matches = check_password_hash(password_hash, password)
     if not user or not user.password_hash or not matches:
         raise APIError("invalid_credentials", "Email or password is incorrect", 401)
-    return login_response(user, jsonify(user=user_payload(user)))
+    mfa_at = None
+    if user.totp_enabled:
+        if not data.get("code"):
+            raise APIError("mfa_required", "Enter your authenticator or recovery code", 403)
+        from .enterprise_security import verify_factor
+
+        verify_factor(user.id, data.get("code"))
+        mfa_at = now()
+    return login_response(user, jsonify(user=user_payload(user)), mfa_at=mfa_at)
 
 
 @bp.get("/me")

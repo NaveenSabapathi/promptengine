@@ -7,6 +7,9 @@ from urllib.parse import quote
 SECRET_NAMES = (
     "SECRET_KEY",
     "JWT_SECRET_KEY",
+    "TOTP_ENCRYPTION_KEY",
+    "DATASET_ENCRYPTION_KEY",
+    "MAIL_HOOK_SECRET",
     "DATABASE_URL",
     "OPENAI_API_KEY",
     "GOOGLE_CLIENT_SECRET",

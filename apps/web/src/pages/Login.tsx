@@ -9,7 +9,7 @@ import {
 import { ArrowRight, Check, LoaderCircle } from "lucide-react";
 import type { AuthResponse } from "@promptengine/shared-types";
 import { useAuth } from "@/auth";
-import { api, post, errorText } from "@/lib/api";
+import { api, post, errorText, APIException } from "@/lib/api";
 import { Brand, Notice } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,8 @@ export default function Login({ signup = false }: { signup?: boolean }) {
   const [params] = useSearchParams();
   const [caps, setCaps] = useState<Capabilities>();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [mfa, setMfa] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -58,10 +60,20 @@ export default function Login({ signup = false }: { signup?: boolean }) {
       await post<AuthResponse>(`/api/auth/${signup ? "signup" : "login"}`, {
         email,
         password,
+        ...(code ? { code } : {}),
+        ...(signup
+          ? {
+              device_id: deviceId(),
+              ...(params.get("ref")
+                ? { referral_code: params.get("ref") }
+                : {}),
+            }
+          : {}),
       });
       await auth.refresh();
       navigate(from, { replace: true });
     } catch (e) {
+      if (e instanceof APIException && e.code === "mfa_required") setMfa(true);
       setError(errorText(e));
     } finally {
       setBusy(false);
@@ -191,6 +203,21 @@ export default function Login({ signup = false }: { signup?: boolean }) {
                 {show ? "Hide" : "Show"}
               </button>
             </div>
+            {mfa && (
+              <>
+                <label htmlFor="login-code">
+                  Authenticator or recovery code
+                </label>
+                <Input
+                  id="login-code"
+                  autoComplete="one-time-code"
+                  required
+                  maxLength={80}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </>
+            )}
             <Button type="submit" disabled={busy} className="w-full">
               {busy ? (
                 <LoaderCircle className="animate-spin" />
@@ -213,4 +240,13 @@ export default function Login({ signup = false }: { signup?: boolean }) {
       </section>
     </main>
   );
+}
+
+function deviceId() {
+  let value = localStorage.getItem("referral-device-id");
+  if (!value) {
+    value = crypto.randomUUID();
+    localStorage.setItem("referral-device-id", value);
+  }
+  return value;
 }

@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
   function clear() {
+    sessionStorage.removeItem("active-team");
     setUser(null);
     setLinked([]);
   }

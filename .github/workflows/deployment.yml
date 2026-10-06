@@ -26,6 +26,11 @@ jobs:
         run: docker compose --env-file .deploy.env exec -T web nginx -t
       - name: HTTPS deployment and recovery integration checks
         run: python deploy/smoke.py
+      - name: Verify backup scheduler and secondary database
+        run: |
+          sh deploy/backup-cron.sh
+          sh deploy/enable-replication.sh
+          docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml exec -T secondary psql -U postgres -d promptengine -v ON_ERROR_STOP=1 -c 'SELECT pg_is_in_recovery(); SELECT count(*) FROM users;'
       - name: Diagnostic logs (no secret files)
         if: failure()
         run: |
@@ -33,4 +38,4 @@ jobs:
           docker compose --env-file .deploy.env logs --no-color --tail 150
       - name: Remove disposable containers and data
         if: always()
-        run: docker compose --env-file .deploy.env down -v
+        run: docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml down -v

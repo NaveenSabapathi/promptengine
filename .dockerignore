@@ -13,3 +13,5 @@ deploy/secrets
 deploy/tls
 backups
 *.zip
+
+deploy/state

@@ -199,9 +199,11 @@ describe("popup workflow", () => {
     mocks.read.mockResolvedValue({});
     const user = userEvent.setup();
     render(<App />);
-    await user.type(
-      await screen.findByLabelText("API server address"),
-      "https://workspace.example.com",
+    expect(await screen.findByLabelText("API server address")).toHaveValue(
+      "https://promptlogic.io",
+    );
+    expect(screen.getByLabelText(/Web app address/)).toHaveValue(
+      "https://promptlogic.io",
     );
     expect(
       screen.getByRole("button", { name: "Connect workspace" }),
@@ -211,11 +213,11 @@ describe("popup workflow", () => {
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: "Connect workspace" }));
     expect(mocks.permission).toHaveBeenCalledWith({
-      origins: ["https://workspace.example.com/*"],
+      origins: ["https://promptlogic.io/*"],
     });
     expect(mocks.write).toHaveBeenCalledWith({
       settings: expect.objectContaining({
-        apiOrigin: "https://workspace.example.com",
+        apiOrigin: "https://promptlogic.io",
         consent: true,
       }),
     });
