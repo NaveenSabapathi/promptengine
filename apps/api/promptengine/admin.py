@@ -341,39 +341,68 @@ def export():
     data = json_body()
     minimum = integer(data, "minimum_rating", 1, 5, 3)
     reason = text_field(data, "reason", 500, 5)
-    rows = db.session.scalars(
+    started = now()
+    query = (
         db.select(DatasetPromptLog)
         .join(User)
         .where(
             User.dataset_consent.is_(True),
             DatasetPromptLog.quality_rating >= minimum,
-            DatasetPromptLog.created_at > now() - timedelta(days=30),
+            DatasetPromptLog.created_at > started - timedelta(days=30),
+            DatasetPromptLog.created_at <= started,
         )
         .order_by(DatasetPromptLog.log_id)
-        .limit(10000)
-    ).all()
-    # Bound the export, perform all authorization before returning any bytes.
-    content = "\n".join(
-        json.dumps(
-            {
-                "messages": [
-                    {"role": "system", "content": "Compile a clear, accurate task prompt."},
-                    {"role": "user", "content": json.dumps(r.raw_input_context)},
-                    {"role": "assistant", "content": r.final_prompt_output},
-                ]
-            },
-            ensure_ascii=False,
-        )
-        for r in rows
     )
+    engine = db.engine
+    app = current_app._get_current_object()
     audit(
         "admin.dataset_exported",
         "dataset",
-        {"records": len(rows), "minimum_rating": minimum, "reason": reason},
+        {"max_records": 10000, "minimum_rating": minimum, "reason": reason},
     )
     db.session.commit()
+
+    def lines():
+        from sqlalchemy.exc import SQLAlchemyError
+
+        cursor, count = None, 0
+        try:
+            while count < 10000:
+                page = query if cursor is None else query.where(DatasetPromptLog.log_id > cursor)
+                # Keyset pagination bounds memory and releases the DB connection
+                # before yielding to a slow client. Consent is rechecked per page.
+                with Session(engine) as session:
+                    rows = session.scalars(page.limit(min(100, 10000 - count))).all()
+                    batch = [
+                        json.dumps(
+                            {
+                                "messages": [
+                                    {
+                                        "role": "system",
+                                        "content": "Compile a clear, accurate task prompt.",
+                                    },
+                                    {"role": "user", "content": json.dumps(r.raw_input_context)},
+                                    {"role": "assistant", "content": r.final_prompt_output},
+                                ]
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                        for r in rows
+                    ]
+                    if rows:
+                        cursor = rows[-1].log_id
+                if not batch:
+                    break
+                for line in batch:
+                    count += 1
+                    yield line
+        except SQLAlchemyError as exc:
+            app.logger.error("Dataset export interrupted (%s)", type(exc).__name__)
+            raise RuntimeError("Dataset export interrupted; retry the download") from None
+
     return Response(
-        content + ("\n" if content else ""),
+        lines(),
         mimetype="application/x-ndjson",
         headers={"Content-Disposition": 'attachment; filename="promptlogic-training.ndjson"'},
     )

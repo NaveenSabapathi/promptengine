@@ -484,3 +484,51 @@ def test_totp_recovery_concurrent_use(app, client, feature_keys):
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(login, range(2))) == [200, 403]
+
+
+def test_dataset_export_requires_rating_and_current_consent(app, client, feature_keys):
+    import json
+
+    admin = admin_client(app, feature_keys)
+    signup(client)
+    assert (
+        client.post(
+            "/api/dataset/consent", json={"enabled": True}, headers=web_headers(client)
+        ).status_code
+        == 200
+    )
+    uid = user_id(app)
+    with app.app_context():
+        for i, rating in enumerate((None, 2, 4)):
+            db.session.add(
+                DatasetPromptLog(
+                    user_id=uid,
+                    preset_key="coding",
+                    raw_input_context={"task": f"Task {i}"},
+                    final_prompt_output=f"Prompt {i}",
+                    model_response="{}",
+                    token_metrics={},
+                    quality_rating=rating,
+                )
+            )
+        db.session.commit()
+    response = admin.post(
+        "/api/admin/dataset/export",
+        json={"reason": "Reviewed training examples"},
+        headers=web_headers(admin),
+    )
+    assert response.status_code == 200
+    records = [json.loads(line) for line in response.data.decode().splitlines()]
+    assert len(records) == 1 and records[0]["messages"][-1]["content"] == "Prompt 2"
+    assert (
+        client.post(
+            "/api/dataset/consent", json={"enabled": False}, headers=web_headers(client)
+        ).status_code
+        == 200
+    )
+    after = admin.post(
+        "/api/admin/dataset/export",
+        json={"reason": "Consent withdrawal test"},
+        headers=web_headers(admin),
+    )
+    assert after.data == b""
