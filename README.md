@@ -2,12 +2,16 @@
 
 A preset-driven prompt workspace and companion Chrome/Firefox extension.
 
-**Phases 1–5 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
+**Phases 1–6 implemented:** PostgreSQL + Flask core, email/password and Google/Microsoft
 OpenID Connect authentication, revocable web sessions, extension pairing, scoped
 extension tokens, atomic daily AI quotas, saved prompt APIs, six presets, OpenAI refinement,
 local compiling, content-free token metrics, Razorpay subscriptions/webhooks, custom presets, and a responsive React workspace with history and billing.
 
-The web application and API are implemented. Chrome/Firefox extension packages are implemented. Production deployment (Phase 6) remains. No fake AI, OAuth, or payment responses are served.
+The web application and API are implemented. Chrome/Firefox extension packages are implemented. Docker/Gunicorn/Nginx production packaging is implemented; live deployment requires operator configuration. No fake AI, OAuth, or payment responses are served.
+
+## Installation and setup
+
+Start with the [complete installation and setup manual](docs/INSTALLATION.md) for local development, VPS deployment, provider setup, extensions, backups, updates and troubleshooting.
 
 ## Repository layout
 
@@ -24,6 +28,8 @@ The web application and API are implemented. Chrome/Firefox extension packages a
 | `docs/phase-3.md` | Billing, verified webhooks, custom presets and free launch policy |
 | `docs/phase-4.md` | Web application, provider login, browser tests and setup |
 | `docs/phase-5.md` | Extension builds, installation, pairing, insertion and release checks |
+| `docs/phase-6.md` | Production containers, TLS and database recovery |
+| `docs/INSTALLATION.md` | Complete installation and operator setup manual |
 
 ## Run the API
 
