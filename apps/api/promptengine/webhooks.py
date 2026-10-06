@@ -170,6 +170,9 @@ def apply_event(data, receipt):
         entitlement.plan_tier = "pro"
         entitlement.daily_ai_limit = current_app.config["PRO_DAILY_AI_LIMIT"]
         entitlement.expires_at = end
+        from .referrals import paid_conversion
+
+        paid_conversion(record.user_id, payment)
         # Preserve actual daily usage; an upgrade changes the limit rather than erasing the ledger.
     else:
         new_status = event.split(".", 1)[1]

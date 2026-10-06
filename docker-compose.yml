@@ -1,6 +1,6 @@
 name: promptengine
 x-api: &api
-  image: promptengine-api:${RELEASE_TAG:-local}
+  image: ${API_IMAGE:-promptengine-api}:${RELEASE_TAG:-local}
   build:
     context: .
     dockerfile: apps/api/Dockerfile
@@ -17,6 +17,11 @@ x-api: &api
     TRUST_PROXY: 'true'
     POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     SECRET_KEY_FILE: /run/secrets/session_secret
+    TOTP_ENCRYPTION_KEY_FILE: /run/secrets/totp_key
+    DATASET_ENCRYPTION_KEY_FILE: /run/secrets/dataset_key
+    MAIL_HOOK_SECRET_FILE: /run/secrets/mail_hook_secret
+    DATASET_ENABLED: ${DATASET_ENABLED:-false}
+    MAIL_HOOK_URL: ${MAIL_HOOK_URL:-}
     JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret
     OPENAI_API_KEY_FILE: /run/secrets/openai_key
     GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_secret
@@ -40,6 +45,9 @@ x-api: &api
     - postgres_password
     - session_secret
     - jwt_secret
+    - totp_key
+    - dataset_key
+    - mail_hook_secret
     - openai_key
     - google_secret
     - microsoft_secret
@@ -83,7 +91,7 @@ services:
       db: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
   web:
-    image: promptengine-web:${RELEASE_TAG:-local}
+    image: ${WEB_IMAGE:-promptengine-web}:${RELEASE_TAG:-local}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -134,3 +142,6 @@ secrets:
   microsoft_secret: {file: ./deploy/secrets/microsoft_secret}
   razorpay_secret: {file: ./deploy/secrets/razorpay_secret}
   razorpay_webhook_secret: {file: ./deploy/secrets/razorpay_webhook_secret}
+  totp_key: {file: ./deploy/secrets/totp_key}
+  dataset_key: {file: ./deploy/secrets/dataset_key}
+  mail_hook_secret: {file: ./deploy/secrets/mail_hook_secret}

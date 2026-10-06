@@ -45,6 +45,10 @@ def successful_response(value, output, engine, user_id, start, provider=None):
         latency_ms=max(0, round((monotonic() - start) * 1000)),
     )
     db.session.add(record)
+    if engine == "ai":
+        from .datasets import enqueue
+
+        enqueue(value, output, metrics)
     db.session.commit()
     return jsonify(
         **output,
@@ -74,7 +78,10 @@ def list_presets():
 def execute_ai(value, user_id):
     start = monotonic()
     # The reservation is committed; no database lock is held during this network call.
-    result = refine_with_openai(value)
+    try:
+        result = refine_with_openai(value)
+    finally:
+        g.provider_latency_ms = max(0, round((monotonic() - start) * 1000))
     return successful_response(value, result.output, "ai", user_id, start, result)
 
 

@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-const name = "PromptEngine";
+const name = "PromptLogic";
 const shared = {
   name,
-  version: "0.1.0",
+  version: "0.2.0",
+  homepage_url: "https://promptlogic.io",
   description:
     "Craft prompts in your paired workspace. Insert plain text into ChatGPT, Claude or Gemini without sending.",
   icons: {
@@ -18,7 +19,10 @@ const popup = {
   default_title: name,
   default_icon: shared.icons,
 };
-const hosts = ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"];
+const hosts =
+  process.env.EXTENSION_DEVELOPMENT === "true"
+    ? ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]
+    : ["https://promptlogic.io/*"];
 const gecko = {
   id: "promptengine@naveensabapathi.github.io",
   strict_min_version: "140.0",

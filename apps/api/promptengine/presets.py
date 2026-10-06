@@ -160,6 +160,7 @@ def get_preset(preset_id):
         from .custom_presets import as_preset, require_custom_access
         from .extensions import db
         from .models import CustomPreset
+        from .teams import asset_scope
 
         require_custom_access()
         cached = g.get("custom_preset")
@@ -172,7 +173,7 @@ def get_preset(preset_id):
         record = db.session.scalar(
             db.select(CustomPreset).where(
                 CustomPreset.id == local_id,
-                CustomPreset.user_id == g.user.id,
+                asset_scope(CustomPreset),
             )
         )
         if not record:

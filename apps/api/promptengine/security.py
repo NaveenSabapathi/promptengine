@@ -89,9 +89,9 @@ def rate_limit(action, limit, seconds=60, identity=None):
         raise APIError("rate_limited", "Too many attempts. Please try again later", 429)
 
 
-def login_response(user, response):
+def login_response(user, response, mfa_at=None):
     instant = now()
-    record = WebSession(user_id=user.id, expires_at=instant + timedelta(hours=12))
+    record = WebSession(user_id=user.id, expires_at=instant + timedelta(hours=12), mfa_at=mfa_at)
     db.session.add(record)
     db.session.flush()
     encoded = create_access_token(identity=str(user.id), additional_claims={"sid": str(record.id)})
@@ -152,6 +152,9 @@ def requires_auth(scope=None, web_only=False):
             g.user = db.session.get(User, user_id)
             if g.user is None:
                 raise APIError("unauthorized", "Account no longer exists", 401)
+            from .teams import resolve_team
+
+            resolve_team()
             return function(*args, **kwargs)
 
         return wrapped

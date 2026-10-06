@@ -13,6 +13,15 @@ def effective_entitlement(entitlement):
     if entitlement is None:
         raise APIError("entitlement_missing", "Account entitlement is unavailable", 503)
     if (
+        entitlement.override_tier
+        and entitlement.override_limit
+        and entitlement.override_expires_at
+        and entitlement.override_expires_at > now()
+    ):
+        return entitlement.override_tier, entitlement.override_limit
+    if entitlement.bonus_expires_at and entitlement.bonus_expires_at > now():
+        return "pro", current_app.config["PRO_DAILY_AI_LIMIT"]
+    if (
         entitlement.plan_tier == "pro"
         and entitlement.expires_at is not None
         and entitlement.expires_at <= now()
@@ -29,6 +38,7 @@ def reserve_ai_request(user_id):
             Entitlement.user_id == user_id,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     _, limit = effective_entitlement(entitlement)
     day = now().date()  # The documented billing/quota boundary is UTC midnight.

@@ -22,6 +22,10 @@ export async function api<T>(
     throw new Error("API requests must use a local API path");
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
+  if (/^\/api\/(prompts|custom-presets|compile|refine)(?:\/|$)/.test(path)) {
+    const team = sessionStorage.getItem("active-team");
+    if (team) headers.set("X-Team-ID", team);
+  }
   if (options.body) headers.set("Content-Type", "application/json");
   if (
     options.method &&

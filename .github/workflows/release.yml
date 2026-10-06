@@ -1,0 +1,95 @@
+name: Validated production release
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full main commit SHA with successful Application and Production container validation
+        required: true
+permissions:
+  contents: read
+  actions: read
+  packages: write
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.verify.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Require both CI workflows to have passed on the requested main commit
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.commit }}
+        run: |
+          [[ "$SHA" =~ ^[a-f0-9]{40}$ ]]
+          git merge-base --is-ancestor "$SHA" origin/main
+          git cat-file -e "$SHA:deploy/release.sh"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&per_page=100" > runs.json
+          python - <<'PY'
+          import json
+          rows=json.load(open('runs.json'))['workflow_runs']
+          for name in ('Application validation','Production container validation'):
+              runs=[r for r in rows if r['name']==name and r['event']=='push']
+              assert runs and max(runs,key=lambda r:r['id'])['conclusion']=='success', f'{name} must pass for this commit'
+          PY
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+  images:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set lowercase registry path
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-api:${{ needs.verify.outputs.sha }}
+          provenance: true
+          sbom: true
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-web:${{ needs.verify.outputs.sha }}
+          provenance: true
+          sbom: true
+  deploy:
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Deploy using a pinned host key and restricted deployment operator
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER: ${{ vars.DEPLOY_USER }}
+          SHA: ${{ needs.verify.outputs.sha }}
+        run: |
+          [[ "$HOST" =~ ^[a-zA-Z0-9.-]+$ && "$USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/deploy_key' EXIT
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" "cd /srv/promptengine && sh deploy/release.sh $SHA"

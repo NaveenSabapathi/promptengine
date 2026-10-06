@@ -1,0 +1,11 @@
+# Install as the deployment operator; replace /srv/promptengine with checkout path.
+# A Docker-capable operator is privileged. Keep this file and environment root-owned.
+SHELL=/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin
+# Verified daily dump. Configure restic credentials in the operator's protected env.
+15 2 * * * /srv/promptengine/deploy/backup-cron.sh >> /var/log/promptlogic-backup.log 2>&1
+# Durable asynchronous dataset and mail batches; no HTTP endpoint can trigger mail delivery.
+* * * * * cd /srv/promptengine && flock -n /tmp/promptlogic-dataset.lock docker compose --env-file .deploy.env exec -T api flask --app wsgi dataset-worker >> /var/log/promptlogic-workers.log 2>&1
+*/5 * * * * cd /srv/promptengine && flock -n /tmp/promptlogic-mail.lock docker compose --env-file .deploy.env exec -T api flask --app wsgi mail-worker >> /var/log/promptlogic-workers.log 2>&1
+25 3 * * * cd /srv/promptengine && docker compose --env-file .deploy.env exec -T api flask --app wsgi cleanup-telemetry
+35 3 * * * cd /srv/promptengine && docker compose --env-file .deploy.env exec -T api flask --app wsgi cleanup-auth

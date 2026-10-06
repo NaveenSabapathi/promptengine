@@ -8,7 +8,7 @@ from requests.exceptions import RequestException
 from .entitlements import effective_entitlement
 from .errors import APIError
 from .extensions import db
-from .models import BillingSubscription, Entitlement
+from .models import BillingSubscription, Coupon, CouponRedemption, Entitlement
 from .razorpay_provider import checkout_url, provider_client, require_checkout, verified_plan
 from .security import json_body, now, rate_limit, requires_auth
 
@@ -102,12 +102,39 @@ def status():
 def subscribe():
     require_checkout()
     data = json_body()
-    if data != {"plan_tier": "pro"}:
-        raise APIError("invalid_plan", "Send only plan_tier: pro")
+    if data.get("plan_tier") != "pro" or set(data) - {"plan_tier", "redemption_id"}:
+        raise APIError(
+            "invalid_plan", "Send plan_tier: pro and an optional redeemed discount identifier"
+        )
     user_id = g.user.id
     rate_limit("subscribe", 5, identity=str(user_id))
     with provider_client() as client:
         verified_plan(client)  # No paid plan or price comes from client input.
+        # Re-verify a discounted provider plan before obtaining business locks.
+        if data.get("redemption_id"):
+            from .security import uuid_field
+
+            probe = db.session.get(CouponRedemption, uuid_field(data["redemption_id"]))
+            if not probe or probe.user_id != user_id or probe.subscription_id:
+                raise APIError("coupon_unavailable", "Discount is unavailable", 409)
+            discount_probe = db.session.get(Coupon, probe.coupon_id)
+            if not discount_probe.razorpay_plan_id or discount_probe.expires_at <= now():
+                raise APIError("coupon_unavailable", "Discount is unavailable", 409)
+            try:
+                discounted = client.plan.fetch(discount_probe.razorpay_plan_id)
+            except (RequestException, BadRequestError, GatewayError, ServerError) as exc:
+                raise APIError(
+                    "billing_unavailable", "Unable to verify discount price", 503
+                ) from exc
+            item = discounted.get("item", {})
+            if (
+                discounted.get("id") != discount_probe.razorpay_plan_id
+                or discounted.get("period") != "monthly"
+                or discounted.get("interval") != 1
+                or item.get("amount") != discount_probe.amount_paise
+                or item.get("currency") != "INR"
+            ):
+                raise APIError("discount_plan_mismatch", "Discount plan needs review", 503)
         entitlement = lock_entitlement(user_id)
         existing = db.session.scalar(
             db.select(BillingSubscription).where(
@@ -121,13 +148,33 @@ def subscribe():
             raise APIError(
                 "subscription_exists", "A subscription is active or needs reconciliation", 409
             )
-        record = BillingSubscription(
-            user_id=user_id,
-            plan_id=current_app.config["RAZORPAY_PRO_PLAN_ID"],
-            amount_paise=current_app.config["PRO_PRICE_PAISE"],
+        plan_id, amount = (
+            current_app.config["RAZORPAY_PRO_PLAN_ID"],
+            current_app.config["PRO_PRICE_PAISE"],
         )
+        redemption = None
+        if data.get("redemption_id"):
+            from .security import uuid_field
+
+            redemption = db.session.scalar(
+                db.select(CouponRedemption)
+                .where(
+                    CouponRedemption.id == uuid_field(data["redemption_id"]),
+                    CouponRedemption.user_id == user_id,
+                )
+                .with_for_update()
+            )
+            if not redemption or redemption.subscription_id:
+                raise APIError("coupon_unavailable", "Discount is unavailable", 409)
+            discount = db.session.get(Coupon, redemption.coupon_id)
+            if discount.discount_type == "days_extension" or discount.expires_at <= now():
+                raise APIError("coupon_unavailable", "Discount is unavailable", 409)
+            plan_id, amount = discount.razorpay_plan_id, discount.amount_paise
+        record = BillingSubscription(user_id=user_id, plan_id=plan_id, amount_paise=amount)
         db.session.add(record)
         db.session.flush()
+        if redemption:
+            redemption.subscription_id = record.id
         attempt_id, plan_id = record.id, record.plan_id
         previous_remote_id = entitlement.razorpay_subscription_id
         db.session.commit()  # Durable attempt; no DB transaction during provider creation.

@@ -99,3 +99,7 @@ See [Phase 5 installation and security boundaries](docs/phase-5.md). Build all b
 ## Phase 6 production deployment
 
 See [Phase 6 deployment and recovery](docs/phase-6.md). Initialize private host configuration with `python3 deploy/init.py --domain YOUR_DOMAIN`, install trusted TLS certificates, then build/start with `docker compose --env-file .deploy.env`. The stack runs PostgreSQL, migrations, Gunicorn and Nginx; only Nginx exposes ports. Paid checkout stays disabled by default.
+
+## Enterprise production
+
+See [enterprise deployment and recovery](docs/enterprise-production.md) for administrator/MFA setup, teams, referral and coupon rules, consented dataset logging, CI/CD, scheduled verified backups, secondary PostgreSQL and store archives for https://promptlogic.io.

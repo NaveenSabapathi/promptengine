@@ -59,6 +59,14 @@ jobs:
       - run: npm run build:extension
       - run: npm run test:extension
       - run: npm run lint:firefox --workspace @promptengine/extension
+      - run: node scripts/store-archive.mjs
+        working-directory: apps/extension
+      - run: git archive --format=zip --output=apps/extension/dist/store/promptlogic-reviewer-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: promptlogic-store-packages
+          path: apps/extension/dist/store/*.zip
+          retention-days: 30
 
   browser:
     runs-on: ubuntu-latest
