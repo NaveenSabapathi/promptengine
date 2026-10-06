@@ -38,6 +38,7 @@ def reserve_ai_request(user_id):
             Entitlement.user_id == user_id,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     _, limit = effective_entitlement(entitlement)
     day = now().date()  # The documented billing/quota boundary is UTC midnight.

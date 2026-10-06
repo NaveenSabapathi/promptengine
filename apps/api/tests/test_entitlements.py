@@ -55,3 +55,28 @@ def test_expired_pro_falls_back_to_free_and_new_day_resets(app, client):
     assert usage["plan_tier"] == "free"
     assert usage["daily_ai_limit"] == 10
     assert usage["used"] == 0
+
+
+def test_locked_reservation_refreshes_a_previously_cached_entitlement(app, client):
+    from sqlalchemy.orm import Session
+
+    from promptengine.entitlements import reserve_ai_request
+    from promptengine.models import User
+
+    signup(client)
+    with app.app_context():
+        user_id = db.session.scalar(db.select(User.id))
+        record = db.session.get(Entitlement, user_id)
+        record.plan_tier, record.daily_ai_limit = "pro", 100
+        db.session.commit()
+        # Retain a loaded identity-map row, as custom-preset validation does.
+        assert record.daily_ai_limit == 100
+        with Session(db.engine) as external:
+            external.execute(
+                db.update(Entitlement)
+                .where(Entitlement.user_id == user_id)
+                .values(plan_tier="free", daily_ai_limit=10)
+            )
+            external.commit()
+        _, _, limit = reserve_ai_request(user_id)
+        assert limit == 10

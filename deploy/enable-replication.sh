@@ -14,3 +14,10 @@ docker compose --env-file .deploy.env exec -T db sh -c 'line="host replication p
 docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml up -d db
 # Allow primary restart to complete before taking the base backup.
 docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.replica.yml up -d --wait --wait-timeout 180 secondary
+
+# Preserve the overlay in later controlled releases.
+if grep -q '^SECONDARY_ENABLED=' .deploy.env; then
+    sed -i 's/^SECONDARY_ENABLED=.*/SECONDARY_ENABLED=true/' .deploy.env
+else
+    printf '\nSECONDARY_ENABLED=true\n' >> .deploy.env
+fi

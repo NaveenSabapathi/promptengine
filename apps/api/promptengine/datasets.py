@@ -83,7 +83,12 @@ def consent():
         raise APIError("invalid_consent", "Provide enabled as a boolean")
     if data["enabled"] and not current_app.config["DATASET_ENABLED"]:
         raise APIError("dataset_disabled", "Training-data collection is disabled", 403)
-    user = db.session.scalar(db.select(User).where(User.id == g.user.id).with_for_update())
+    user = db.session.scalar(
+        db.select(User)
+        .where(User.id == g.user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     user.dataset_consent = data["enabled"]
     user.consent_version += 1
     if not user.dataset_consent:
