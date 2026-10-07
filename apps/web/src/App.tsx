@@ -29,6 +29,7 @@ import Presets from "./pages/Presets";
 import SecurityPage from "./pages/Security";
 import Teams from "./pages/Teams";
 import Rewards from "./pages/Rewards";
+import Support from "./pages/Support";
 import Admin from "./pages/Admin";
 function Shell() {
   const auth = useAuth();
@@ -147,6 +148,7 @@ function Shell() {
         </main>
         <footer className="app-footer">
           PromptEngine <span>Clarity before execution.</span>
+          <a href="/support" target="_blank" rel="noreferrer" className="ml-4 hover:underline text-slate-500">Support</a>
         </footer>
       </div>
     </div>
@@ -158,6 +160,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Login signup />} />
+      <Route path="/support" element={<Support />} />
       <Route element={<Shell />}>
         <Route path="/workspace" element={<Workspace />} />
         <Route path="/history" element={<History />} />
