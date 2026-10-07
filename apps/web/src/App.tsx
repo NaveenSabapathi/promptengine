@@ -148,7 +148,7 @@ function Shell() {
         </main>
         <footer className="app-footer">
           PromptEngine <span>Clarity before execution.</span>
-          <a href="/support" target="_blank" rel="noreferrer" className="ml-4 hover:underline text-slate-500">Support</a>
+          <a href="/support" target="_blank" rel="noreferrer" className="ml-4 hover:underline text-slate-600">Support</a>
         </footer>
       </div>
     </div>
