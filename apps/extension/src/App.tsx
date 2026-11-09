@@ -1,4 +1,10 @@
 import {
+  PrecisionControls,
+  PrecisionResult,
+  VariableInputs,
+} from "./Precision";
+import type { TargetModel } from "@promptengine/shared-types";
+import {
   useEffect,
   useState,
   type FormEvent,
@@ -82,6 +88,11 @@ export default function App() {
   const [engine, setEngine] = useState<GenerationEngine>("local");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [result, setResult] = useState<GenerationResponse>();
+  const [targetModel, setTargetModel] = useState<TargetModel>("chatgpt-4o");
+  const [domainConstraints, setDomainConstraints] = useState("");
+  const [templateVariables, setTemplateVariables] = useState<
+    Record<string, string>
+  >({});
   const [advanced, setAdvanced] = useState(false);
   const [tabId, setTabId] = useState<number>();
   const [site, setSite] = useState<string | null>(null);
@@ -116,6 +127,9 @@ export default function App() {
             setMode(saved.mode);
             setEngine(saved.engine);
             setFields(saved.fields);
+            setTargetModel(saved.targetModel || "chatgpt-4o");
+            setDomainConstraints(saved.domainConstraints || "");
+            setTemplateVariables(saved.templateVariables || {});
             setResult(saved.result);
           }
           setAuth(stored.auth);
@@ -147,6 +161,9 @@ export default function App() {
       setRaw("");
       setCatalog(undefined);
       setFields({});
+      setTemplateVariables({});
+      setDomainConstraints("");
+      setTargetModel("chatgpt-4o");
       setCustom([]);
       setConfigure(false);
     };
@@ -166,6 +183,9 @@ export default function App() {
       () =>
         void saveEditor({
           owner: auth.token_id,
+          targetModel,
+          domainConstraints,
+          templateVariables,
           raw,
           preset,
           tone,
@@ -177,7 +197,20 @@ export default function App() {
       150,
     );
     return () => clearTimeout(timer);
-  }, [ready, auth?.token_id, raw, preset, tone, mode, engine, fields, result]);
+  }, [
+    ready,
+    auth?.token_id,
+    raw,
+    preset,
+    tone,
+    mode,
+    engine,
+    fields,
+    result,
+    targetModel,
+    domainConstraints,
+    templateVariables,
+  ]);
   async function load() {
     try {
       const [p, u, c] = await Promise.all([
@@ -198,6 +231,9 @@ export default function App() {
           if (preset.startsWith("custom_")) {
             setPreset("coding");
             setFields({});
+            setTemplateVariables({});
+            setDomainConstraints("");
+            setTargetModel("chatgpt-4o");
           }
         } else throw e;
       }
@@ -242,6 +278,9 @@ export default function App() {
         setResult(undefined);
         setRaw("");
         setFields({});
+        setTemplateVariables({});
+        setDomainConstraints("");
+        setTargetModel("chatgpt-4o");
         setPreset("coding");
       }
       await setStored({ settings: next });
@@ -337,6 +376,9 @@ export default function App() {
       setResult(undefined);
       setRaw("");
       setFields({});
+      setTemplateVariables({});
+      setDomainConstraints("");
+      setTargetModel("chatgpt-4o");
       setDisconnectOpen(false);
       setConfigure(false);
       setBusy(false);
@@ -350,6 +392,47 @@ export default function App() {
   const selected = [...(catalog?.presets || []), ...custom].find(
     (p) => p.id === preset,
   );
+  async function sharpen(
+    answers: Record<string, string>,
+    variables: Record<string, string>,
+  ) {
+    if (!result) return;
+    setBusy(true);
+    setError("");
+    try {
+      const output = await request<GenerationResponse>("/api/refine/iterate", {
+        raw_input: raw,
+        preset,
+        tone,
+        mode,
+        engine,
+        target_model: targetModel,
+        domain_constraints: domainConstraints,
+        fields: Object.fromEntries(
+          Object.entries(fields).filter(([, v]) => v.trim()),
+        ),
+        prior_draft: result.prompt,
+        answers,
+        variables,
+      });
+      setResult(output);
+      setFields((f) => ({
+        ...f,
+        ...Object.fromEntries(
+          Object.entries(answers).filter(
+            ([k, v]) =>
+              !!v.trim() &&
+              !!selected &&
+              k in { ...selected.required_fields, ...selected.optional_fields },
+          ),
+        ),
+      }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function generate(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -373,6 +456,9 @@ export default function App() {
         engine === "ai" ? "/api/refine" : "/api/compile",
         {
           raw_input: raw,
+          variables: templateVariables,
+          target_model: targetModel,
+          domain_constraints: domainConstraints,
           preset,
           tone,
           mode,
@@ -697,6 +783,17 @@ export default function App() {
               </div>
             ) : (
               <form onSubmit={(e) => void generate(e)}>
+                <VariableInputs
+                  text={raw + JSON.stringify(selected || {})}
+                  values={templateVariables}
+                  setValues={setTemplateVariables}
+                />
+                <PrecisionControls
+                  target={targetModel}
+                  setTarget={setTargetModel}
+                  context={domainConstraints}
+                  setContext={setDomainConstraints}
+                />
                 <label htmlFor="preset">Preset</label>
                 <select
                   id="preset"
@@ -705,6 +802,9 @@ export default function App() {
                   onChange={(e) => {
                     setPreset(e.target.value as PresetId);
                     setFields({});
+                    setTemplateVariables({});
+                    setDomainConstraints("");
+                    setTargetModel("chatgpt-4o");
                   }}
                 >
                   {catalog.presets.map((p) => (
@@ -888,16 +988,12 @@ export default function App() {
                   value={result.prompt}
                   className="generated-prompt"
                 />
-                {result.clarification_questions.length > 0 && (
-                  <details className="clarifications" open>
-                    <summary>Worth clarifying</summary>
-                    <ul>
-                      {result.clarification_questions.map((q, i) => (
-                        <li key={i}>{q}</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
+                <PrecisionResult
+                  key={result.generation_id}
+                  result={result}
+                  busy={busy}
+                  apply={sharpen}
+                />
                 {result.assumptions.length > 0 && (
                   <details className="clarifications">
                     <summary>Assumptions</summary>

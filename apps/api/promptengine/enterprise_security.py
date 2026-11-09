@@ -193,3 +193,29 @@ def disable():
     audit("mfa.disabled", user.id)
     db.session.commit()
     return jsonify(ok=True)
+
+
+def redact_sensitive(text):
+    """Redact before provider transmission; never log matched values."""
+    from .datasets import PATTERNS
+
+    patterns = [
+        (r"\b\d{3}-\d{2}-\d{4}\b", "[SSN]"),
+        (r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)", "[PAYMENT_CARD]"),
+    ] + list(PATTERNS)
+    custom = current_app.config.get("REDACTION_PATTERNS", [])
+    if not isinstance(custom, list) or len(custom) > 20:
+        raise APIError("redaction_configuration", "Invalid redaction configuration", 503)
+    count = 0
+    # regex timeouts prevent administrator-defined expressions stalling workers.
+    import regex
+
+    for pattern, replacement in patterns + [(p, "[REDACTED]") for p in custom]:
+        if not isinstance(pattern, str) or len(pattern) > 512:
+            raise APIError("redaction_configuration", "Invalid redaction configuration", 503)
+        try:
+            text, matched = regex.subn(pattern, replacement, text, timeout=0.05)
+        except (regex.error, TimeoutError) as exc:
+            raise APIError("redaction_configuration", "Redaction could not complete", 503) from exc
+        count += matched
+    return text, count

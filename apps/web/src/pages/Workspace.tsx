@@ -1,3 +1,9 @@
+import {
+  PrecisionControls,
+  PrecisionResult,
+  VariableInputs,
+} from "@/components/Precision";
+import type { TargetModel } from "@promptengine/shared-types";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -41,6 +47,11 @@ export default function Workspace() {
   const [engine, setEngine] = useState<GenerationEngine>("local");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [result, setResult] = useState<GenerationResponse>();
+  const [targetModel, setTargetModel] = useState<TargetModel>("chatgpt-4o");
+  const [domainConstraints, setDomainConstraints] = useState("");
+  const [templateVariables, setTemplateVariables] = useState<
+    Record<string, string>
+  >({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -79,6 +90,47 @@ export default function Workspace() {
   const selected = [...(catalog?.presets || []), ...custom].find(
     (p) => p.id === preset,
   );
+  async function sharpen(
+    answers: Record<string, string>,
+    variables: Record<string, string>,
+  ) {
+    if (!result) return;
+    setBusy(true);
+    setError("");
+    try {
+      const output = await post<GenerationResponse>("/api/refine/iterate", {
+        raw_input: raw,
+        preset,
+        tone,
+        mode,
+        engine,
+        target_model: targetModel,
+        domain_constraints: domainConstraints,
+        fields: Object.fromEntries(
+          Object.entries(fields).filter(([, v]) => v.trim()),
+        ),
+        prior_draft: result.prompt,
+        answers,
+        variables,
+      });
+      setResult(output);
+      setFields((f) => ({
+        ...f,
+        ...Object.fromEntries(
+          Object.entries(answers).filter(
+            ([k, v]) =>
+              !!v.trim() &&
+              !!selected &&
+              k in { ...selected.required_fields, ...selected.optional_fields },
+          ),
+        ),
+      }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function generate(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -91,6 +143,9 @@ export default function Workspace() {
         `/api/${engine === "ai" ? "refine" : "compile"}`,
         {
           raw_input: raw,
+          variables: templateVariables,
+          target_model: targetModel,
+          domain_constraints: domainConstraints,
           preset,
           tone,
           mode,
@@ -172,6 +227,17 @@ export default function Workspace() {
               <span className="muted">INPUT</span>
             </div>
             <form onSubmit={(e) => void generate(e)}>
+              <VariableInputs
+                text={raw + JSON.stringify(selected || {})}
+                values={templateVariables}
+                setValues={setTemplateVariables}
+              />
+              <PrecisionControls
+                target={targetModel}
+                setTarget={setTargetModel}
+                context={domainConstraints}
+                setContext={setDomainConstraints}
+              />
               <div className="editor-body">
                 <label htmlFor="preset">Choose your preset</label>
                 <select
@@ -400,16 +466,12 @@ export default function Workspace() {
                   value={result.prompt}
                   className="generated-prompt min-h-[320px]"
                 />
-                {result.clarification_questions.length > 0 && (
-                  <div className="clarifications">
-                    <h3>Worth clarifying</h3>
-                    <ul>
-                      {result.clarification_questions.map((q, i) => (
-                        <li key={i}>{q}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <PrecisionResult
+                  key={result.generation_id}
+                  result={result}
+                  busy={busy}
+                  apply={sharpen}
+                />
                 {result.assumptions.length > 0 && (
                   <details className="assumptions">
                     <summary>Assumptions ({result.assumptions.length})</summary>

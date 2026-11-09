@@ -43,8 +43,9 @@ test("real API: signup, compile, save, search, edit, custom preset, billing, rev
   await page
     .getByLabel("What do you want to accomplish?")
     .fill(
-      "Build a PostgreSQL-backed customer dashboard with search and role-based access.",
+      "Build a PostgreSQL-backed customer dashboard with search and role-based access for {{audience}}.",
     );
+  await page.getByLabel("audience", { exact: true }).fill("engineers");
   await page.getByRole("button", { name: "Add context & constraints" }).click();
   await page.getByLabel("stack Core context").fill("Python and Flask");
   await page
@@ -53,6 +54,12 @@ test("real API: signup, compile, save, search, edit, custom preset, billing, rev
   await page.getByRole("button", { name: "Build prompt" }).click();
   await expect(page.getByLabel("Generated prompt")).toHaveValue(/PostgreSQL/);
   await expect(page.getByText("Tokens added")).toBeVisible();
+  await expect(page.getByRole("progressbar")).toBeVisible();
+  await page.getByRole("button", { name: "Apply & Sharpen" }).click();
+  await expect(
+    page.getByRole("button", { name: "Apply & Sharpen" }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("Generated prompt")).toHaveValue(/engineers/);
   await shot(page, "workspace-generated");
   await page.getByRole("button", { name: "Save to library" }).click();
   await page.getByLabel("Prompt title").fill("Client dashboard");

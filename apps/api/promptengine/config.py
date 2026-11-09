@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -70,6 +71,7 @@ def configuration():
     ):
         raise RuntimeError("DATASET_ENABLED requires DATASET_ENCRYPTION_KEY")
     return {
+        "REDACTION_PATTERNS": json.loads(os.getenv("REDACTION_PATTERNS", "[]")),
         "TOTP_ENCRYPTION_KEY": os.getenv("TOTP_ENCRYPTION_KEY", ""),
         "DATASET_ENCRYPTION_KEY": os.getenv("DATASET_ENCRYPTION_KEY", ""),
         "DATASET_ENABLED": os.getenv("DATASET_ENABLED", "false").lower() == "true",

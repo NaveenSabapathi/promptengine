@@ -59,6 +59,13 @@ def require_provider():
 def refine_with_openai(value):
     require_provider()
     compiled = compile_messages(value)
+    from flask import g
+
+    from .enterprise_security import redact_sensitive
+
+    system, system_count = redact_sensitive(compiled.system_prompt)
+    user, user_count = redact_sensitive(compiled.user_message)
+    g.redacted_entities_count = system_count + user_count
     try:
         # Disable automatic retries: one admitted generation makes at most one provider request.
         with OpenAI(
@@ -69,8 +76,8 @@ def refine_with_openai(value):
             response = client.chat.completions.create(
                 model=current_app.config["OPENAI_MODEL"],
                 messages=[
-                    {"role": "system", "content": compiled.system_prompt},
-                    {"role": "user", "content": compiled.user_message},
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
                 ],
                 response_format={
                     "type": "json_schema",

@@ -19,6 +19,7 @@ const allowedPaths = new Set([
   ...publicPaths,
   "/api/compile",
   "/api/refine",
+  "/api/refine/iterate",
   "/api/usage",
   "/api/custom-presets",
   "/api/prompts",

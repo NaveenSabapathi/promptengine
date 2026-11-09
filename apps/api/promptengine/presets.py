@@ -5,6 +5,34 @@ from flask import g, has_request_context
 
 from .errors import APIError
 
+TARGET_PROFILES = {
+    "chatgpt-4o": "Use clear headings, explicit deliverables and acceptance criteria.",
+    "openai-reasoning": (
+        "State the goal and constraints directly. Request conclusions and concise "
+        "justification, not private chain of thought. "
+    ),
+    "claude-3-7-sonnet": (
+        "Structure the prompt with XML tags for task, context, constraints and "
+        "output; escape task data inside tags. "
+    ),
+    "gemini-2-5-pro": (
+        "Separate task, referenced media, constraints and expected output. Never "
+        "invent unavailable media. "
+    ),
+    "perplexity-search": (
+        "Specify search scope, freshness and citation requirements. Distinguish "
+        "evidence from inference. "
+    ),
+    "midjourney-v7": (
+        "Describe subject, composition, lighting, style and aspect ratio. Produce an "
+        "image prompt, not an assistant conversation. "
+    ),
+    "video-gen": (
+        "Describe subject, scene, camera motion, temporal sequence, duration and "
+        "visual style without assuming unsupported tool parameters. "
+    ),
+}
+
 PRESET_VERSION = "2026-10-04.1"
 TONES = ("professional", "concise", "friendly", "technical", "persuasive")
 MODES = ("Build", "Compact")
