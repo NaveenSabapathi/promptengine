@@ -74,6 +74,11 @@ test("installed Chrome extension: actual pairing, scoped API, storage, insertion
       .getByLabel("What do you want to accomplish?")
       .fill("Build a client dashboard with PostgreSQL and role-based access.");
     await popup.getByRole("button", { name: "Build prompt" }).click();
+    await expect(popup.getByRole("progressbar")).toBeVisible();
+    await popup.getByRole("button", { name: "Apply & Sharpen" }).click();
+    await expect(
+      popup.getByRole("button", { name: "Apply & Sharpen" }),
+    ).toBeEnabled();
     const prompt = await popup.getByLabel("Generated prompt").inputValue();
     expect(prompt).toContain("PostgreSQL");
     await expect(popup.getByText("Added", { exact: true })).toBeVisible();

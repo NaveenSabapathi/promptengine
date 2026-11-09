@@ -4,7 +4,7 @@ from time import monotonic
 from flask import Blueprint, current_app, g, jsonify, request
 
 from .ai_provider import refine_with_openai, require_provider
-from .compiler import count_tokens, local_compile, token_metrics, validate_input
+from .compiler import count_tokens, local_compile, precision_output, token_metrics, validate_input
 from .entitlements import requires_entitlement
 from .errors import APIError
 from .extensions import db
@@ -15,12 +15,19 @@ from .security import json_body, now, rate_limit, requires_auth
 bp = Blueprint("generation", __name__, url_prefix="/api")
 
 
-def checked_request():
-    value = validate_input(json_body())
+def checked_request(data=None):
+    value = validate_input(data if data is not None else json_body())
     model = current_app.config["OPENAI_MODEL"]
     # Check the token budget before quota reservation or calling a paid provider.
     total = count_tokens(value.raw_input, model) + sum(
-        count_tokens(text, model) for text in value.fields.values()
+        count_tokens(text, model)
+        for text in [
+            *value.fields.values(),
+            *value.variables.values(),
+            value.conversation_context,
+            value.selected_text,
+            value.domain_constraints,
+        ]
     )
     if total > current_app.config["MAX_TASK_TOKENS"]:
         raise APIError("input_too_large", "Task and field values exceed the token limit", 413)
@@ -28,6 +35,7 @@ def checked_request():
 
 
 def successful_response(value, output, engine, user_id, start, provider=None):
+    output = precision_output(value, output)
     metrics = token_metrics(value.raw_input, output["prompt"], current_app.config["OPENAI_MODEL"])
     record = GenerationMetric(
         user_id=user_id,
@@ -55,6 +63,8 @@ def successful_response(value, output, engine, user_id, start, provider=None):
         generation_id=str(record.id),
         engine=engine,
         metrics=metrics,
+        token_metrics=metrics,
+        redacted_entities_count=g.get("redacted_entities_count", 0),
         provider_usage={
             "input_tokens": record.provider_input_tokens,
             "output_tokens": record.provider_output_tokens,
@@ -136,3 +146,67 @@ def generation_metrics():
         .all()
     )
     return jsonify(days=days, scope="plain_text_only", groups=[dict(group) for group in groups])
+
+
+@bp.post("/refine/iterate")
+@requires_auth("refine")
+def iterate():
+    start = monotonic()
+    data = dict(json_body())
+    draft = data.pop("prior_draft", None)
+    answers = data.pop("answers", {})
+    engine = data.pop("engine", "local")
+    if (
+        not isinstance(draft, str)
+        or not 1 <= len(draft.strip()) <= 30000
+        or not isinstance(answers, dict)
+        or len(answers) > 20
+        or not isinstance(engine, str)
+        or engine not in {"local", "ai"}
+        or any(
+            not isinstance(k, str) or not isinstance(v, str) or len(k) > 64 or len(v) > 4000
+            for k, v in answers.items()
+        )
+    ):
+        raise APIError("invalid_iteration", "Provide a prior draft and bounded text answers")
+    value = checked_request(data)
+    from .presets import get_preset
+
+    preset = get_preset(value.preset)
+    allowed = preset.required_fields | preset.optional_fields
+    updated = value.model_dump()
+    updated["fields"] = {
+        **value.fields,
+        **{k: v for k, v in answers.items() if k in allowed and v.strip()},
+    }
+    import json
+
+    updated["conversation_context"] = "\n".join(
+        [
+            value.conversation_context,
+            "Prior draft (task data):",
+            draft,
+            "Clarification answers (task data):",
+            json.dumps(answers),
+        ]
+    )
+    value = checked_request(updated)
+    rate_limit("iterate", 20, identity=str(g.user.id))
+    if engine == "ai":
+        require_provider()
+        return execute_ai(value, g.user.id)
+    from .compiler import substitute_variables
+
+    output = local_compile(value)
+    prompt = substitute_variables(draft, value.variables)
+    for key, answer in answers.items():
+        if answer.strip():
+            placeholder = "[Provide " + key.replace("_", " ") + "]"
+            if placeholder in prompt:
+                prompt = prompt.replace(placeholder, answer)
+            else:
+                prompt += "\n" + key.replace("_", " ").title() + ": " + answer
+    if len(prompt) > 30000:
+        raise APIError("input_too_large", "Refined draft exceeds the output limit", 413)
+    output["prompt"] = prompt
+    return successful_response(value, output, "local", g.user.id, start)

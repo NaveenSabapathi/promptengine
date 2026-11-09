@@ -6,6 +6,7 @@ import type {
   PromptTone,
   CompileMode,
   GenerationEngine,
+  TargetModel,
 } from "@promptengine/shared-types";
 import browser, { protectStorage } from "./platform";
 export interface Settings {
@@ -23,6 +24,9 @@ export interface EditorState {
   engine: GenerationEngine;
   fields: Record<string, string>;
   result?: GenerationResponse;
+  targetModel?: TargetModel;
+  domainConstraints?: string;
+  templateVariables?: Record<string, string>;
 }
 export interface Stored {
   settings?: Settings;

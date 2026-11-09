@@ -581,3 +581,10 @@ label small {
     transition-duration: 0.01ms !important;
   }
 }
+
+.precision { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #64748b; border-radius: .75rem; margin: .75rem 0; }
+.precision label, .precision fieldset { display: grid; gap: .4rem; min-width: 0; }
+.precision input, .precision textarea, .precision select { color: inherit; background: transparent; border: 1px solid #64748b; border-radius: .4rem; padding: .5rem; width: 100%; }
+.precision button { border: 1px solid #64748b; border-radius: .4rem; padding: .5rem; }
+.precision button[aria-pressed="true"] { background: #4338ca; color: white; }
+.precision progress { width: 100%; accent-color: #6366f1; }

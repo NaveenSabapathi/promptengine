@@ -96,7 +96,30 @@ export interface PresetList {
   tones: PromptTone[];
   modes: CompileMode[];
 }
+export type TargetModel =
+  | "chatgpt-4o"
+  | "openai-reasoning"
+  | "claude-3-7-sonnet"
+  | "gemini-2-5-pro"
+  | "perplexity-search"
+  | "midjourney-v7"
+  | "video-gen";
+export interface ClarificationQuestion {
+  id: string;
+  question: string;
+  suggested_options: string[];
+}
+export interface IterateRequest extends CompileRequest {
+  prior_draft: string;
+  answers: Record<string, string>;
+  engine?: GenerationEngine;
+}
 export interface CompileRequest {
+  target_model?: TargetModel;
+  variables?: Record<string, string>;
+  conversation_context?: string;
+  selected_text?: string;
+  domain_constraints?: string;
   raw_input: string;
   preset: PresetId;
   tone?: PromptTone;
@@ -117,7 +140,16 @@ export interface TokenMetrics {
 export interface GenerationResponse {
   prompt: string;
   missing_fields: string[];
-  clarification_questions: string[];
+  clarification_questions: (string | ClarificationQuestion)[];
+  quality_score?: number;
+  raw_quality_score?: number;
+  score_breakdown?: Record<
+    "clarity" | "specificity" | "constraints" | "formatting",
+    number
+  >;
+  detected_variables?: string[];
+  redacted_entities_count?: number;
+  token_metrics?: TokenMetrics;
   assumptions: string[];
   generation_id: string;
   engine: GenerationEngine;

@@ -17,3 +17,5 @@ razorpay>=2,<3
 pyotp>=2.9,<3
 argon2-cffi>=25.1,<26
 qrcode[pil]>=8.2,<9
+
+regex>=2025.7,<2027

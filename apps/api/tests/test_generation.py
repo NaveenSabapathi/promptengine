@@ -301,3 +301,17 @@ def test_input_token_budget_is_checked_before_quota_and_provider(
     assert response.status_code == 413
     assert provider["requests"] == []
     assert client.get("/api/usage").json["used"] == 0
+
+
+def test_precision_redacts_provider_payload(client, provider):
+    signup(client)
+    secret = "sk-proj-abcdefghijklmnop"
+    response = client.post(
+        "/api/refine",
+        json={**TASK, "target_model": "chatgpt-4o", "selected_text": "API key: " + secret},
+        headers=web_headers(client),
+    )
+    assert response.status_code == 200
+    assert secret not in json.dumps(provider["requests"])
+    assert response.json["redacted_entities_count"] >= 1
+    assert isinstance(response.json["clarification_questions"][0], dict)
